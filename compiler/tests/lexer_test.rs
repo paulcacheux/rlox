@@ -1,4 +1,7 @@
-use compiler::lexer::{Lexer, SpannedToken, Token};
+use compiler::{
+    lexer::{Lexer, SpannedToken, Token},
+    CompilationContext,
+};
 use once_cell::sync::Lazy;
 use regex;
 use std::{
@@ -29,7 +32,7 @@ impl LexerExpectToken {
         }
     }
 
-    fn from_token(st: SpannedToken, input_source: &str) -> Self {
+    fn from_token(st: SpannedToken, ctx: &CompilationContext, input_source: &str) -> Self {
         let literal = if st.span.is_invalid() {
             String::new()
         } else {
@@ -47,7 +50,7 @@ impl LexerExpectToken {
                 kind: "STRING".to_owned(),
                 literal,
                 number_value: None,
-                string_value: Some(value),
+                string_value: Some(ctx.resolve_str_symbol(value)),
             },
             Token::BoolLiteral(value) => LexerExpectToken {
                 kind: if value { "TRUE" } else { "FALSE" }.to_owned(),
@@ -56,6 +59,7 @@ impl LexerExpectToken {
                 string_value: None,
             },
             Token::Identifier(id) => {
+                let id = ctx.resolve_str_symbol(id);
                 assert_eq!(literal, id, "literal and identifier should match");
                 LexerExpectToken {
                     kind: "IDENTIFIER".to_owned(),
@@ -133,7 +137,9 @@ fn expected_tokens_test(input_path: &str) {
 
     let input_content =
         std::fs::read_to_string(&actual_input_path).expect("Failed to read input file");
-    let mut lexer = Lexer::new(&input_content);
+
+    let context = CompilationContext::default();
+    let mut lexer = Lexer::new(&context, &input_content);
 
     let test_desc_file =
         std::fs::File::open(&actual_input_path).expect("Failed to open test description file");
@@ -144,7 +150,7 @@ fn expected_tokens_test(input_path: &str) {
 
         if let Some(expect_token) = LexerExpectToken::parse_from_line(&line) {
             let given_token = lexer.next_token().expect("Failed to get next token");
-            let given_token = LexerExpectToken::from_token(given_token, &input_content);
+            let given_token = LexerExpectToken::from_token(given_token, &context, &input_content);
 
             assert_eq!(
                 given_token, expect_token,

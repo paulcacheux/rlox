@@ -9,24 +9,28 @@ pub use comment_remover::CommentRemover;
 pub use span::{Span, SpannedToken};
 pub use token::Token;
 
-pub struct Lexer<I>
+use crate::CompilationContext;
+
+pub struct Lexer<'c, I>
 where
     I: Iterator<Item = (usize, char)>,
 {
+    ctx: &'c CompilationContext,
     src: Peekable<I>,
     buffer: Option<SpannedToken>,
 }
 
-impl<'s> Lexer<CommentRemover<CharIndices<'s>>> {
-    pub fn new(content: &'s str) -> Self {
+impl<'c, 's> Lexer<'c, CommentRemover<CharIndices<'s>>> {
+    pub fn new(ctx: &'c CompilationContext, content: &'s str) -> Self {
         Lexer {
+            ctx,
             src: CommentRemover::new(content.char_indices()).peekable(),
             buffer: None,
         }
     }
 }
 
-impl<I> Lexer<I>
+impl<'c, I> Lexer<'c, I>
 where
     I: Iterator<Item = (usize, char)>,
 {
@@ -95,7 +99,7 @@ where
             "super" => Token::SuperKeyword,
             "true" => Token::BoolLiteral(true),
             "false" => Token::BoolLiteral(false),
-            _ => Token::Identifier(identifier),
+            _ => Token::Identifier(self.ctx.intern_string(identifier)),
         };
 
         SpannedToken {
@@ -160,8 +164,9 @@ where
             }
         }
 
+        let value_symbol = self.ctx.intern_string(value);
         SpannedToken {
-            token: Token::StringLiteral(value),
+            token: Token::StringLiteral(value_symbol),
             span: Span { begin, end },
         }
     }

@@ -1,12 +1,14 @@
-#[derive(Debug, Clone, PartialEq)]
+use string_interner::DefaultSymbol;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Token {
     // literals
     NumberLiteral(f64),
-    StringLiteral(String),
+    StringLiteral(DefaultSymbol),
     BoolLiteral(bool),
 
     // identifier and keywords
-    Identifier(String),
+    Identifier(DefaultSymbol),
     ClassKeyword,
     FunKeyword,
     VarKeyword,
