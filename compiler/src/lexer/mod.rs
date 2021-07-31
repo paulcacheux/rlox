@@ -1,4 +1,5 @@
 mod comment_remover;
+mod peekable;
 mod span;
 mod token;
 
@@ -6,11 +7,13 @@ use core::fmt;
 use std::{iter::Peekable, str::CharIndices};
 
 pub use comment_remover::CommentRemover;
+pub use peekable::PeekableLexer;
 pub use span::{Span, SpannedToken};
 pub use token::Token;
 
 use crate::CompilationContext;
 
+#[derive(Debug, Clone)]
 pub struct Lexer<'c, I>
 where
     I: Iterator<Item = (usize, char)>,
@@ -34,6 +37,10 @@ impl<'c, I> Lexer<'c, I>
 where
     I: Iterator<Item = (usize, char)>,
 {
+    pub fn peekable(self) -> PeekableLexer<'c, I> {
+        PeekableLexer::new(self)
+    }
+
     fn next_skip_whitespaces(&mut self) -> Option<(usize, char)> {
         for (pos, c) in &mut self.src {
             if c.is_ascii_whitespace() {

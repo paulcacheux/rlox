@@ -1,6 +1,6 @@
 use super::Token;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct SpannedToken {
     pub token: Token,
     pub span: Span,
