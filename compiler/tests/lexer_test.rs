@@ -33,7 +33,7 @@ impl LexerExpectToken {
         let literal = if st.span.is_invalid() {
             String::new()
         } else {
-            input_source[st.span.pos..st.span.pos + st.span.len].to_owned()
+            input_source[st.span.begin..st.span.end].to_owned()
         };
 
         match st.token {

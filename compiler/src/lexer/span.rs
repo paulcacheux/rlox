@@ -10,7 +10,10 @@ impl SpannedToken {
     pub fn single_char(token: Token, pos: usize) -> Self {
         SpannedToken {
             token,
-            span: Span { pos, len: 1 },
+            span: Span {
+                begin: pos,
+                end: pos + 1,
+            },
         }
     }
 
@@ -24,14 +27,14 @@ impl SpannedToken {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
-    pub pos: usize,
-    pub len: usize,
+    pub begin: usize,
+    pub end: usize,
 }
 
 impl Span {
     const INVALID: Self = Span {
-        pos: usize::MAX,
-        len: 0,
+        begin: usize::MAX,
+        end: 0,
     };
 
     pub fn is_invalid(&self) -> bool {

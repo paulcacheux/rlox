@@ -46,33 +46,33 @@ where
         condition: char,
         if_true: Token,
         if_false: Token,
-        start_pos: usize,
+        begin: usize,
     ) -> SpannedToken {
         match self.src.peek() {
-            Some(&(_, next_c)) if next_c == condition => {
+            Some(&(current_pos, next_c)) if next_c == condition => {
                 self.src.next();
                 SpannedToken {
                     token: if_true,
                     span: Span {
-                        pos: start_pos,
-                        len: 2,
+                        begin,
+                        end: current_pos + next_c.len_utf8(),
                     },
                 }
             }
-            _ => SpannedToken::single_char(if_false, start_pos),
+            _ => SpannedToken::single_char(if_false, begin),
         }
     }
 
-    fn emit_identifier(&mut self, pos: usize, first_c: char) -> SpannedToken {
+    fn emit_identifier(&mut self, first_c: char, begin: usize) -> SpannedToken {
         let mut identifier = String::new();
         identifier.push(first_c);
-        let mut len = 1;
+        let mut end = begin + first_c.len_utf8();
 
-        while let Some(&(_, c)) = self.src.peek() {
+        while let Some(&(current_pos, c)) = self.src.peek() {
             if is_identifier_continue(c) {
                 self.src.next();
                 identifier.push(c);
-                len += 1;
+                end = current_pos.saturating_add(c.len_utf8());
             } else {
                 break;
             }
@@ -100,22 +100,22 @@ where
 
         SpannedToken {
             token,
-            span: Span { pos, len },
+            span: Span { begin, end },
         }
     }
 
-    fn emit_number(&mut self, pos: usize, first_c: char) -> Result<SpannedToken, LexerError> {
+    fn emit_number(&mut self, first_c: char, begin: usize) -> Result<SpannedToken, LexerError> {
         let mut value = String::new();
         value.push(first_c);
-        let mut len = 1;
         let mut is_pointed = false;
         let mut point_at_end_position = None;
+        let mut end = begin + first_c.len_utf8();
 
         while let Some(&(current_pos, c)) = self.src.peek() {
             if c.is_ascii_digit() || (c == '.' && !is_pointed) {
                 self.src.next();
                 value.push(c);
-                len += 1;
+                end = current_pos + c.len_utf8();
                 if c == '.' {
                     is_pointed = true;
                     point_at_end_position = Some(current_pos)
@@ -130,26 +130,29 @@ where
         // Terrible hack to handle "123." that should emit "123" then "." without 2-char lookahead
         if let Some(point_at_end_pos) = point_at_end_position {
             self.buffer = Some(SpannedToken::single_char(Token::Dot, point_at_end_pos));
-            value.pop();
-            len -= 1;
+            if let Some(popped) = value.pop() {
+                end -= popped.len_utf8();
+            }
         }
+
+        let span = Span { begin, end };
 
         let value = value
             .parse()
-            .map_err(|_| LexerError::NumberParseError { pos })?;
+            .map_err(|_| LexerError::NumberParseError { span })?;
 
         Ok(SpannedToken {
             token: Token::NumberLiteral(value),
-            span: Span { pos, len },
+            span,
         })
     }
 
-    fn emit_string_literal(&mut self, pos: usize) -> SpannedToken {
+    fn emit_string_literal(&mut self, begin: usize) -> SpannedToken {
         let mut value = String::new();
-        let mut last_pos = pos;
+        let mut end = begin + '"'.len_utf8();
 
         for (current_pos, c) in &mut self.src {
-            last_pos = current_pos;
+            end = current_pos + c.len_utf8();
             if c != '"' {
                 value.push(c);
             } else {
@@ -159,10 +162,7 @@ where
 
         SpannedToken {
             token: Token::StringLiteral(value),
-            span: Span {
-                pos,
-                len: last_pos - pos + 1,
-            },
+            span: Span { begin, end },
         }
     }
 
@@ -191,8 +191,8 @@ where
                 self.emit_if_next('=', Token::GreaterOrEqual, Token::GreaterThan, pos)
             }
 
-            Some((pos, c)) if is_identifier_start(c) => self.emit_identifier(pos, c),
-            Some((pos, c)) if c.is_ascii_digit() => self.emit_number(pos, c)?,
+            Some((pos, c)) if is_identifier_start(c) => self.emit_identifier(c, pos),
+            Some((pos, c)) if c.is_ascii_digit() => self.emit_number(c, pos)?,
             Some((pos, '"')) => self.emit_string_literal(pos),
 
             Some((pos, c)) => return Err(LexerError::UnexpectedChar { c, pos }),
@@ -214,7 +214,7 @@ fn is_identifier_continue(c: char) -> bool {
 #[derive(Debug)]
 pub enum LexerError {
     UnexpectedChar { c: char, pos: usize },
-    NumberParseError { pos: usize },
+    NumberParseError { span: Span },
 }
 
 impl fmt::Display for LexerError {
@@ -223,8 +223,8 @@ impl fmt::Display for LexerError {
             LexerError::UnexpectedChar { c, pos } => {
                 write!(f, "[pos: {}] Unexpected character `{}`", pos, c)
             }
-            LexerError::NumberParseError { pos } => {
-                write!(f, "[pos: {}] Number parse error", pos)
+            LexerError::NumberParseError { span } => {
+                write!(f, "[span: {:?}] Number parse error", span)
             }
         }
     }
