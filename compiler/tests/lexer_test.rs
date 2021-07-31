@@ -12,10 +12,11 @@ struct LexerExpectToken {
     kind: String,
     literal: String,
     number_value: Option<f64>,
+    string_value: Option<String>,
 }
 
 static EXPECT_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
-    regex::Regex::new(r"// expect: (\w+) (\S*) (\S+)").expect("Failed to compile regex")
+    regex::Regex::new(r"// expect: (\w+) (\S*) (\S*)").expect("Failed to compile regex")
 });
 
 impl LexerExpectToken {
@@ -24,6 +25,7 @@ impl LexerExpectToken {
             kind: kind.to_owned(),
             literal,
             number_value: None,
+            string_value: None,
         }
     }
 
@@ -39,12 +41,19 @@ impl LexerExpectToken {
                 kind: "NUMBER".to_owned(),
                 literal,
                 number_value: Some(value),
+                string_value: None,
             },
-            Token::StringLiteral(_) => todo!(),
+            Token::StringLiteral(value) => LexerExpectToken {
+                kind: "STRING".to_owned(),
+                literal,
+                number_value: None,
+                string_value: Some(value),
+            },
             Token::BoolLiteral(value) => LexerExpectToken {
                 kind: if value { "TRUE" } else { "FALSE" }.to_owned(),
                 literal,
                 number_value: None,
+                string_value: None,
             },
             Token::Identifier(id) => {
                 assert_eq!(literal, id, "literal and identifier should match");
@@ -52,6 +61,7 @@ impl LexerExpectToken {
                     kind: "IDENTIFIER".to_owned(),
                     literal,
                     number_value: None,
+                    string_value: None,
                 }
             }
             Token::ClassKeyword => LexerExpectToken::simple_kind("CLASS", literal),
@@ -93,17 +103,23 @@ impl LexerExpectToken {
 
     fn parse_from_line(line: &str) -> Option<Self> {
         if let Some(captures) = EXPECT_REGEX.captures(&line) {
-            let number_value_str = &captures[3];
-            let number_value = if number_value_str == "null" {
-                None
+            let kind = captures[1].to_owned();
+            let value_str = &captures[3];
+            let (number_value, string_value) = if value_str == "null" {
+                (None, None)
+            } else if kind == "NUMBER" {
+                (value_str.parse().ok(), None)
+            } else if kind == "STRING" {
+                (None, Some(value_str.to_owned()))
             } else {
-                number_value_str.parse().ok()
+                unreachable!("Unexpected value (not NUMBER nor STRING)")
             };
 
             Some(LexerExpectToken {
-                kind: captures[1].to_owned(),
+                kind,
                 literal: captures[2].to_owned(),
                 number_value,
+                string_value,
             })
         } else {
             None

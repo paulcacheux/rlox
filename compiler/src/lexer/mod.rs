@@ -12,12 +12,14 @@ where
     I: Iterator<Item = (usize, char)>,
 {
     src: Peekable<I>,
+    buffer: Option<SpannedToken>,
 }
 
 impl<'s> Lexer<CommentRemover<CharIndices<'s>>> {
     pub fn new(content: &'s str) -> Self {
         Lexer {
             src: CommentRemover::new(content.char_indices()).peekable(),
+            buffer: None,
         }
     }
 }
@@ -100,7 +102,73 @@ where
         }
     }
 
+    fn emit_number(&mut self, pos: usize, first_c: char) -> Result<SpannedToken, LexerError> {
+        let mut value = String::new();
+        value.push(first_c);
+        let mut len = 1;
+        let mut is_pointed = false;
+        let mut point_at_end_position = None;
+
+        while let Some(&(current_pos, c)) = self.src.peek() {
+            if c.is_ascii_digit() || (c == '.' && !is_pointed) {
+                self.src.next();
+                value.push(c);
+                len += 1;
+                if c == '.' {
+                    is_pointed = true;
+                    point_at_end_position = Some(current_pos)
+                } else {
+                    point_at_end_position = None
+                }
+            } else {
+                break;
+            }
+        }
+
+        // Terrible hack to handle "123." that should emit "123" then "." without 2-char lookahead
+        if let Some(point_at_end_pos) = point_at_end_position {
+            self.buffer = Some(SpannedToken::single_char(Token::Dot, point_at_end_pos));
+            value.pop();
+            len -= 1;
+        }
+
+        let value = value
+            .parse()
+            .map_err(|_| LexerError::NumberParseError { pos })?;
+
+        Ok(SpannedToken {
+            token: Token::NumberLiteral(value),
+            span: Span { pos, len },
+        })
+    }
+
+    fn emit_string_literal(&mut self, pos: usize) -> SpannedToken {
+        let mut value = String::new();
+        let mut last_pos = pos;
+
+        while let Some((current_pos, c)) = self.src.next() {
+            last_pos = current_pos;
+            if c != '"' {
+                value.push(c);
+            } else {
+                break;
+            }
+        }
+
+        SpannedToken {
+            token: Token::StringLiteral(value),
+            span: Span {
+                pos,
+                len: last_pos - pos + 1,
+            },
+        }
+    }
+
     pub fn next_token(&mut self) -> Result<SpannedToken, LexerError> {
+        if let Some(st) = self.buffer.take() {
+            return Ok(st);
+        }
+
         let st = match self.next_skip_whitespaces() {
             Some((pos, '(')) => SpannedToken::single_char(Token::LeftParenthesis, pos),
             Some((pos, ')')) => SpannedToken::single_char(Token::RightParenthesis, pos),
@@ -122,6 +190,8 @@ where
             }
 
             Some((pos, c)) if is_identifier_start(c) => self.emit_identifier(pos, c),
+            Some((pos, c)) if c.is_ascii_digit() => self.emit_number(pos, c)?,
+            Some((pos, '"')) => self.emit_string_literal(pos),
 
             Some((pos, c)) => return Err(LexerError::UnexpectedChar { c, pos }),
             None => SpannedToken::eof(),
@@ -181,6 +251,7 @@ impl Span {
 #[derive(Debug)]
 pub enum LexerError {
     UnexpectedChar { c: char, pos: usize },
+    NumberParseError { pos: usize },
 }
 
 impl fmt::Display for LexerError {
@@ -188,6 +259,9 @@ impl fmt::Display for LexerError {
         match self {
             LexerError::UnexpectedChar { c, pos } => {
                 write!(f, "[pos: {}] Unexpected character `{}`", pos, c)
+            }
+            LexerError::NumberParseError { pos } => {
+                write!(f, "[pos: {}] Number parse error", pos)
             }
         }
     }
