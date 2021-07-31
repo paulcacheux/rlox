@@ -4,6 +4,7 @@ use string_interner::{DefaultSymbol, StringInterner};
 
 pub mod lexer;
 pub mod parse_tree;
+pub mod parser;
 
 #[derive(Debug, Default)]
 pub struct CompilationContext {

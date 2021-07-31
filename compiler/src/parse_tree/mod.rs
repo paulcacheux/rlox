@@ -15,7 +15,7 @@ pub enum Expression {
 pub struct ParenthesisExpression {
     pub left_paren_span: Span,
     pub right_paren_span: Span,
-    sub: Box<Expression>,
+    pub sub: Box<Expression>,
 }
 
 #[derive(Debug)]
