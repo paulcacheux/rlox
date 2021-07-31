@@ -31,7 +31,7 @@ where
     I: Iterator<Item = (usize, char)>,
 {
     fn next_skip_whitespaces(&mut self) -> Option<(usize, char)> {
-        while let Some((pos, c)) = self.src.next() {
+        for (pos, c) in &mut self.src {
             if c.is_ascii_whitespace() {
                 continue;
             } else {
@@ -148,7 +148,7 @@ where
         let mut value = String::new();
         let mut last_pos = pos;
 
-        while let Some((current_pos, c)) = self.src.next() {
+        for (current_pos, c) in &mut self.src {
             last_pos = current_pos;
             if c != '"' {
                 value.push(c);
