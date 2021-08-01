@@ -18,11 +18,11 @@ pub struct Parser<'c, 's> {
 
 macro_rules! parse_expr_fn {
     ($fn_name:ident, $sub_fn:ident, $($tok:pat => $op:expr,)+) => {
-        fn $fn_name(&mut self) -> Result<pt::Expression, ParserErrorCommand> {
+        fn $fn_name(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
             let mut lhs = self.$sub_fn()?;
 
             loop {
-                let next_st = self.peek_token(true)?;
+                let next_st = self.peek_token(ExpressionSyncCmd::MidExpression)?;
                 let operator = match next_st.token {
                     $($tok => $op,)+
                     _ => break,
@@ -51,22 +51,22 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
-    fn next_token(&mut self, sync: bool) -> Result<SpannedToken, ParserErrorCommand> {
+    fn next_token<E>(&mut self, potential_error: E) -> Result<SpannedToken, E> {
         match self.lexer.next_token() {
             Ok(st) => Ok(st),
             Err(err) => {
                 self.push_error(err.into());
-                Err(ParserErrorCommand::from_sync(sync))
+                Err(potential_error)
             }
         }
     }
 
-    fn peek_token(&mut self, sync: bool) -> Result<SpannedToken, ParserErrorCommand> {
+    fn peek_token<E>(&mut self, potential_error: E) -> Result<SpannedToken, E> {
         match self.lexer.peek_token() {
             Ok(st) => Ok(st),
             Err(err) => {
                 self.push_error(err.into());
-                Err(ParserErrorCommand::from_sync(sync))
+                Err(potential_error)
             }
         }
     }
@@ -75,8 +75,8 @@ impl<'c, 's> Parser<'c, 's> {
         let _ = self.lexer.next_token();
     }
 
-    fn expect(&mut self, expected: Token, sync: bool) -> Result<Span, ParserErrorCommand> {
-        let next_st = self.next_token(sync)?;
+    fn expect<E: Clone>(&mut self, expected: Token, potential_error: E) -> Result<Span, E> {
+        let next_st = self.next_token(potential_error.clone())?;
         if next_st.token == expected {
             Ok(next_st.span)
         } else {
@@ -84,11 +84,36 @@ impl<'c, 's> Parser<'c, 's> {
                 expected,
                 got: next_st,
             });
-            Err(ParserErrorCommand::from_sync(sync))
+            Err(potential_error)
         }
     }
 
-    pub fn parse_expression(&mut self) -> Result<pt::Expression, ParserErrorCommand> {
+    pub fn parse_statement(&mut self) -> Result<pt::Statement, ()> {
+        unimplemented!()
+    }
+
+    pub fn parse_expression_statement(&mut self) -> Result<pt::Statement, ()> {
+        match self.parse_expression() {
+            Ok(expr) => {
+                let semicolon_span = self.expect(Token::SemiColon, ())?;
+                Ok(pt::Statement::Expression(pt::ExpressionStatement {
+                    expression: Some(Box::new(expr)),
+                    semicolon_span,
+                }))
+            }
+            Err(ExpressionSyncCmd::MidExpression) => {
+                while let Ok(st) = self.next_token(()) {
+                    if st.token == Token::SemiColon {
+                        break;
+                    }
+                }
+                Err(())
+            }
+            Err(ExpressionSyncCmd::EndOfExpression) => Err(()),
+        }
+    }
+
+    pub fn parse_expression(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
         self.parse_logic_or()
     }
 
@@ -117,11 +142,11 @@ impl<'c, 's> Parser<'c, 's> {
         Token::Plus => pt::BinaryOperator::Add,
     );
 
-    fn parse_factor(&mut self) -> Result<pt::Expression, ParserErrorCommand> {
+    fn parse_factor(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
         let mut lhs = self.parse_unary()?;
 
         loop {
-            let next_st = self.peek_token(true)?;
+            let next_st = self.peek_token(ExpressionSyncCmd::MidExpression)?;
             let operator = match next_st.token {
                 Token::Slash => pt::BinaryOperator::Divide,
                 Token::Star => pt::BinaryOperator::Multiply,
@@ -141,8 +166,8 @@ impl<'c, 's> Parser<'c, 's> {
         Ok(lhs)
     }
 
-    fn parse_unary(&mut self) -> Result<pt::Expression, ParserErrorCommand> {
-        let front_st = self.peek_token(true)?;
+    fn parse_unary(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
+        let front_st = self.peek_token(ExpressionSyncCmd::MidExpression)?;
         match front_st.token {
             Token::Bang => {
                 self.advance_lexer();
@@ -166,8 +191,8 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
-    fn parse_primary(&mut self) -> Result<pt::Expression, ParserErrorCommand> {
-        let front_st = self.next_token(true)?;
+    fn parse_primary(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
+        let front_st = self.next_token(ExpressionSyncCmd::MidExpression)?;
         match front_st.token {
             Token::NumberLiteral(value) => Ok(utils::build_literal(
                 tc::Literal::Number(value),
@@ -193,7 +218,11 @@ impl<'c, 's> Parser<'c, 's> {
                     msg: "Expected a literal, or `(`",
                     got: front_st,
                 });
-                Err(ParserErrorCommand::from_sync(other != Token::SemiColon))
+                Err(if other == Token::SemiColon {
+                    ExpressionSyncCmd::EndOfExpression
+                } else {
+                    ExpressionSyncCmd::MidExpression
+                })
             }
         }
     }
@@ -201,9 +230,9 @@ impl<'c, 's> Parser<'c, 's> {
     fn continue_parse_parenthesis_expr(
         &mut self,
         left_span: Span,
-    ) -> Result<pt::Expression, ParserErrorCommand> {
+    ) -> Result<pt::Expression, ExpressionSyncCmd> {
         let sub = self.parse_expression()?;
-        let right_span = self.expect(Token::RightParenthesis, true)?;
+        let right_span = self.expect(Token::RightParenthesis, ExpressionSyncCmd::MidExpression)?;
 
         Ok(pt::Expression::Parenthesis(pt::ParenthesisExpression {
             left_paren_span: left_span,
@@ -217,20 +246,10 @@ impl<'c, 's> Parser<'c, 's> {
     }
 }
 
-#[derive(Debug)]
-pub enum ParserErrorCommand {
-    ErrorEndOfExpression,
-    ErrorMidExpression,
-}
-
-impl ParserErrorCommand {
-    fn from_sync(sync: bool) -> Self {
-        if sync {
-            ParserErrorCommand::ErrorMidExpression
-        } else {
-            ParserErrorCommand::ErrorEndOfExpression
-        }
-    }
+#[derive(Debug, Clone)]
+pub enum ExpressionSyncCmd {
+    EndOfExpression,
+    MidExpression,
 }
 
 mod utils {
