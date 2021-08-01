@@ -1,7 +1,17 @@
 use compiler::{
-    lexer::Lexer, parse_tree as pt, parser::Parser, tree_common as tc, CompilationContext,
+    ast::{
+        self,
+        eval::{self, Evaluator},
+    },
+    lexer::Lexer,
+    parse_tree as pt,
+    parser::Parser,
+    tree_common as tc, CompilationContext,
 };
-use std::io::{BufRead, BufReader};
+use std::{
+    borrow::Cow,
+    io::{BufRead, BufReader},
+};
 
 fn test_debug_binary_operator(op: &pt::BinaryOperator) -> &'static str {
     match op {
@@ -55,36 +65,64 @@ fn test_debug_expr(ctx: &CompilationContext, expr: &pt::Expression) -> String {
     }
 }
 
-#[test]
-fn test_expression_parse_tree() {
-    const INPUT_PATH: &str = "./../testsuite/expressions/parse.lox";
+fn extract_expect(path: &str) -> String {
     const EXPECT_PREFIX: &str = "// expect: ";
 
-    let input_content = std::fs::read_to_string(INPUT_PATH).expect("Failed to read input file");
-
-    let context = CompilationContext::default();
-    let lexer = Lexer::new(&context, &input_content);
-    let mut parser = Parser::new(lexer.peekable());
-
-    let expr = parser
-        .parse_expression()
-        .expect("Failed to parse expression");
-
-    let test_desc_file =
-        std::fs::File::open(INPUT_PATH).expect("Failed to open test description file");
-
+    let test_desc_file = std::fs::File::open(path).expect("Failed to open test description file");
     let reader = BufReader::new(test_desc_file);
-    let mut expected = None;
 
     for line in reader.lines() {
         let line = line.expect("Failed to read line");
 
         if line.starts_with(EXPECT_PREFIX) {
-            expected = Some(line.trim_start_matches(EXPECT_PREFIX).to_owned());
+            return line.trim_start_matches(EXPECT_PREFIX).to_owned();
         }
     }
 
-    let expected = expected.expect("Failed to read expect line from description file");
+    panic!("Failed to exctract expect from test description file")
+}
 
+fn parse_expression(context: &CompilationContext, path: &str) -> pt::Expression {
+    let input_content = std::fs::read_to_string(path).expect("Failed to read input file");
+
+    let lexer = Lexer::new(&context, &input_content);
+    let mut parser = Parser::new(lexer.peekable());
+
+    parser
+        .parse_expression()
+        .expect("Failed to parse expression")
+}
+
+#[test]
+fn test_expression_parse_tree() {
+    const INPUT_PATH: &str = "./../testsuite/expressions/parse.lox";
+    let expected = extract_expect(INPUT_PATH);
+
+    let context = CompilationContext::default();
+    let expr = parse_expression(&context, INPUT_PATH);
     assert_eq!(expected, test_debug_expr(&context, &expr));
+}
+
+#[test]
+fn test_expression_simple_eval() {
+    const INPUT_PATH: &str = "./../testsuite/expressions/evaluate.lox";
+    let expected = extract_expect(INPUT_PATH);
+
+    let context = CompilationContext::default();
+    let expr = parse_expression(&context, INPUT_PATH);
+    let expr = ast::translate::build_ast_expression(expr);
+
+    let mut evaluator = Evaluator::new(&context);
+    let expr_value = evaluator
+        .eval_expression(&expr)
+        .expect("Failed to compute expression value");
+
+    let expr_value_str: Cow<str> = match expr_value {
+        eval::Value::Nil => "nil".into(),
+        eval::Value::Number(value) => value.to_string().into(),
+        eval::Value::Bool(value) => value.to_string().into(),
+        eval::Value::String(sym) => context.resolve_str_symbol(sym).into(),
+    };
+
+    assert_eq!(expected, expr_value_str);
 }

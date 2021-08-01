@@ -1,8 +1,5 @@
 use compiler::{
-    ast::{
-        self,
-        eval::{self, Evaluator},
-    },
+    ast::{self, eval::Evaluator},
     lexer::Lexer,
     parser::Parser,
     CompilationContext,
