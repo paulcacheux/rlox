@@ -1,11 +1,9 @@
 use compiler::{
-    ast::{
-        self,
-        eval::{self, Evaluator},
-    },
+    ast::eval::{self, Evaluator},
     lexer::Lexer,
     parse_tree as pt,
     parser::Parser,
+    pt2ast::Translator,
     tree_common as tc, CompilationContext,
 };
 use std::{
@@ -110,7 +108,9 @@ fn test_expression_simple_eval() {
 
     let context = CompilationContext::default();
     let expr = parse_expression(&context, INPUT_PATH);
-    let expr = ast::translate::build_ast_expression(expr);
+
+    let mut translator = Translator::new(&context);
+    let expr = translator.translate_expression(expr);
 
     let mut evaluator = Evaluator::new(&context);
     let expr_value = evaluator

@@ -32,7 +32,7 @@ pub struct Span {
 }
 
 impl Span {
-    const INVALID: Self = Span {
+    pub const INVALID: Self = Span {
         begin: usize::MAX,
         end: 0,
     };

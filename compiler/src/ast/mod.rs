@@ -2,7 +2,6 @@ use crate::lexer::Span;
 use crate::tree_common as tc;
 
 pub mod eval;
-pub mod translate;
 
 #[derive(Debug)]
 pub struct Program {
@@ -19,7 +18,7 @@ pub enum Statement {
         semicolon_span: Span,
     },
     Block {
-        declarations: Vec<Statement>,
+        statements: Vec<Statement>,
         left_bracket_span: Span,
         right_bracket_span: Span,
     },
@@ -38,7 +37,7 @@ pub enum Statement {
         semicolon_span: Span,
     },
     Expression {
-        expression: Box<Expression>,
+        expression: Option<Box<Expression>>,
         semicolon_span: Span,
     },
 }

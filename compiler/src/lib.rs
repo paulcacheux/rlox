@@ -6,6 +6,7 @@ pub mod ast;
 pub mod lexer;
 pub mod parse_tree;
 pub mod parser;
+pub mod pt2ast;
 pub mod tree_common;
 
 #[derive(Debug, Default)]
