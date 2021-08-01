@@ -10,7 +10,7 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub struct BlockStatement {
-    pub statements: Vec<Statement>,
+    pub declarations: Vec<pt::Declaration>,
     pub left_bracket_span: Span,
     pub right_bracket_span: Span,
 }

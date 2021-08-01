@@ -168,12 +168,12 @@ impl<'c, 's> Parser<'c, 's> {
     pub fn parse_block_statement(&mut self) -> Result<pt::BlockStatement, ParseError> {
         let left_bracket_span = self.expect(Token::LeftBracket)?;
 
-        let mut statements = Vec::new();
+        let mut declarations = Vec::new();
         loop {
             let front_st = self.lexer.peek_token()?;
             if front_st.token != Token::RightBracket {
-                let stmt = self.parse_statement()?;
-                statements.push(stmt);
+                let stmt = self.parse_declaration()?;
+                declarations.push(stmt);
             } else {
                 break;
             }
@@ -181,7 +181,7 @@ impl<'c, 's> Parser<'c, 's> {
 
         let right_bracket_span = self.expect(Token::RightBracket)?;
         Ok(pt::BlockStatement {
-            statements,
+            declarations,
             left_bracket_span,
             right_bracket_span,
         })
