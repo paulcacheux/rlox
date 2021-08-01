@@ -25,12 +25,14 @@ impl<'c> Translator<'c> {
     }
 
     pub fn translate_program(&mut self, prog: pt::Program) -> Result<ast::Program, SemanticError> {
+        self.scopes.begin_scope();
         let statements: Result<Vec<_>, _> = prog
             .declarations
             .into_iter()
             .map(|decl| self.translate_declaration(decl))
             .collect();
         let statements = statements?;
+        self.scopes.end_scope();
 
         Ok(ast::Program { statements })
     }
