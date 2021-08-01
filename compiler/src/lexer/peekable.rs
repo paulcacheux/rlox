@@ -24,7 +24,7 @@ where
         if let Some(saved) = self.peeked.take() {
             Ok(saved)
         } else {
-            self.next_token()
+            self.inner.next_token()
         }
     }
 
