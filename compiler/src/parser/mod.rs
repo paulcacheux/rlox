@@ -2,7 +2,7 @@ use std::str::CharIndices;
 
 use crate::{
     lexer::{CommentRemover, PeekableLexer, Span, SpannedToken, Token},
-    parse_tree as pt,
+    parse_tree as pt, tree_common as tc,
 };
 pub use error::ParseError;
 
@@ -148,7 +148,7 @@ impl<'c, 's> Parser<'c, 's> {
                 self.advance_lexer();
                 let sub = self.parse_unary()?;
                 Ok(pt::Expression::Unary(pt::UnaryExpression {
-                    operator: pt::UnaryOperator::LogicalNot,
+                    operator: tc::UnaryOperator::LogicalNot,
                     operator_span: front_st.span,
                     sub: Box::new(sub),
                 }))
@@ -157,7 +157,7 @@ impl<'c, 's> Parser<'c, 's> {
                 self.advance_lexer();
                 let sub = self.parse_unary()?;
                 Ok(pt::Expression::Unary(pt::UnaryExpression {
-                    operator: pt::UnaryOperator::Minus,
+                    operator: tc::UnaryOperator::Minus,
                     operator_span: front_st.span,
                     sub: Box::new(sub),
                 }))
@@ -170,19 +170,19 @@ impl<'c, 's> Parser<'c, 's> {
         let front_st = self.next_token(true)?;
         match front_st.token {
             Token::NumberLiteral(value) => Ok(utils::build_literal(
-                pt::Literal::Number(value),
+                tc::Literal::Number(value),
                 front_st.span,
             )),
             Token::BoolLiteral(value) => Ok(utils::build_literal(
-                pt::Literal::Bool(value),
+                tc::Literal::Bool(value),
                 front_st.span,
             )),
-            Token::NilKeyword => Ok(utils::build_literal(pt::Literal::Nil, front_st.span)),
+            Token::NilKeyword => Ok(utils::build_literal(tc::Literal::Nil, front_st.span)),
             Token::StringLiteral(sym) => Ok(utils::build_literal(
-                pt::Literal::String(sym),
+                tc::Literal::String(sym),
                 front_st.span,
             )),
-            Token::Identifier(sym) => Ok(pt::Expression::Identifier(pt::IdentifierExpression {
+            Token::Identifier(sym) => Ok(pt::Expression::Identifier(tc::IdentifierExpression {
                 identifier: sym,
                 span: front_st.span,
             })),
@@ -234,9 +234,9 @@ impl ParserErrorCommand {
 }
 
 mod utils {
-    use crate::{lexer::Span, parse_tree as pt};
+    use crate::{lexer::Span, parse_tree as pt, tree_common as tc};
 
-    pub fn build_literal(literal: pt::Literal, span: Span) -> pt::Expression {
-        pt::Expression::Literal(pt::LiteralExpression { literal, span })
+    pub fn build_literal(literal: tc::Literal, span: Span) -> pt::Expression {
+        pt::Expression::Literal(tc::LiteralExpression { literal, span })
     }
 }

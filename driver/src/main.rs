@@ -1,4 +1,4 @@
-use compiler::{lexer::Lexer, parser::Parser, CompilationContext};
+use compiler::{ast, lexer::Lexer, parser::Parser, CompilationContext};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input_path = std::env::args().nth(1).expect("Failed to get input path");
@@ -13,7 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse_expression()
         .expect("Failed to parse expression");
 
-    println!("{:#?}", expr);
+    let ast_expr = ast::translate::build_ast_expression(expr);
+
+    println!("{:#?}", ast_expr);
 
     Ok(())
 }

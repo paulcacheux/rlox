@@ -1,9 +1,11 @@
 use crate::lexer::Span;
 use crate::tree_common as tc;
 
+pub mod translate;
+
 #[derive(Debug)]
 pub enum Expression {
-    Parenthesis(ParenthesisExpression),
+    LazyLogical(LazyLogicalExpression),
     Binary(BinaryExpression),
     Unary(UnaryExpression),
     Literal(tc::LiteralExpression),
@@ -11,10 +13,17 @@ pub enum Expression {
 }
 
 #[derive(Debug)]
-pub struct ParenthesisExpression {
-    pub left_paren_span: Span,
-    pub right_paren_span: Span,
-    pub sub: Box<Expression>,
+pub struct LazyLogicalExpression {
+    pub operator: LazyLogicalOperator,
+    pub operator_span: Span,
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub enum LazyLogicalOperator {
+    LogicalAnd,
+    LogicalOr,
 }
 
 #[derive(Debug)]
@@ -27,8 +36,6 @@ pub struct BinaryExpression {
 
 #[derive(Debug)]
 pub enum BinaryOperator {
-    LogicalAnd,
-    LogicalOr,
     NotEqual,
     Equal,
     LessThan,

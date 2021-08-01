@@ -1,4 +1,6 @@
-use compiler::{lexer::Lexer, parse_tree as pt, parser::Parser, CompilationContext};
+use compiler::{
+    lexer::Lexer, parse_tree as pt, parser::Parser, tree_common as tc, CompilationContext,
+};
 use std::io::{BufRead, BufReader};
 
 fn test_debug_binary_operator(op: &pt::BinaryOperator) -> &'static str {
@@ -18,10 +20,10 @@ fn test_debug_binary_operator(op: &pt::BinaryOperator) -> &'static str {
     }
 }
 
-fn test_debug_unary_operator(op: &pt::UnaryOperator) -> &'static str {
+fn test_debug_unary_operator(op: &tc::UnaryOperator) -> &'static str {
     match op {
-        pt::UnaryOperator::LogicalNot => "!",
-        pt::UnaryOperator::Minus => "-",
+        tc::UnaryOperator::LogicalNot => "!",
+        tc::UnaryOperator::Minus => "-",
     }
 }
 
@@ -44,10 +46,10 @@ fn test_debug_expr(ctx: &CompilationContext, expr: &pt::Expression) -> String {
             test_debug_expr(ctx, sub)
         ),
         pt::Expression::Literal(literal) => match literal.literal {
-            pt::Literal::Number(value) => format!("{:.1}", value),
-            pt::Literal::String(sym) => ctx.resolve_str_symbol(sym).escape_debug().to_string(),
-            pt::Literal::Bool(value) => value.to_string(),
-            pt::Literal::Nil => "nil".to_owned(),
+            tc::Literal::Number(value) => format!("{:.1}", value),
+            tc::Literal::String(sym) => ctx.resolve_str_symbol(sym).escape_debug().to_string(),
+            tc::Literal::Bool(value) => value.to_string(),
+            tc::Literal::Nil => "nil".to_owned(),
         },
         pt::Expression::Identifier(ident) => ctx.resolve_str_symbol(ident.identifier),
     }

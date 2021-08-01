@@ -2,9 +2,11 @@ use std::sync::Mutex;
 
 use string_interner::{DefaultSymbol, StringInterner};
 
+pub mod ast;
 pub mod lexer;
 pub mod parse_tree;
 pub mod parser;
+pub mod tree_common;
 
 #[derive(Debug, Default)]
 pub struct CompilationContext {
