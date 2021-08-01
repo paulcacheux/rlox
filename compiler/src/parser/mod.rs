@@ -1,7 +1,7 @@
 use std::str::CharIndices;
 
 use crate::{
-    lexer::{CommentRemover, PeekableLexer, Span, SpannedToken, Token},
+    lexer::{CommentRemover, PeekableLexer, Span, Token},
     parse_tree as pt, tree_common as tc,
 };
 pub use error::ParseError;
@@ -13,16 +13,15 @@ type ParserLexer<'c, 's> = PeekableLexer<'c, CommentRemover<CharIndices<'s>>>;
 #[derive(Debug)]
 pub struct Parser<'c, 's> {
     lexer: ParserLexer<'c, 's>,
-    errors: Vec<ParseError>,
 }
 
 macro_rules! parse_expr_fn {
     ($fn_name:ident, $sub_fn:ident, $($tok:pat => $op:expr,)+) => {
-        fn $fn_name(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
+        fn $fn_name(&mut self) -> Result<pt::Expression, ParseError> {
             let mut lhs = self.$sub_fn()?;
 
             loop {
-                let next_st = self.peek_token(ExpressionSyncCmd::MidExpression)?;
+                let next_st = self.lexer.peek_token()?;
                 let operator = match next_st.token {
                     $($tok => $op,)+
                     _ => break,
@@ -45,51 +44,27 @@ macro_rules! parse_expr_fn {
 
 impl<'c, 's> Parser<'c, 's> {
     pub fn new(lexer: ParserLexer<'c, 's>) -> Self {
-        Parser {
-            lexer,
-            errors: Vec::new(),
-        }
-    }
-
-    fn next_token<E>(&mut self, potential_error: E) -> Result<SpannedToken, E> {
-        match self.lexer.next_token() {
-            Ok(st) => Ok(st),
-            Err(err) => {
-                self.push_error(err.into());
-                Err(potential_error)
-            }
-        }
-    }
-
-    fn peek_token<E>(&mut self, potential_error: E) -> Result<SpannedToken, E> {
-        match self.lexer.peek_token() {
-            Ok(st) => Ok(st),
-            Err(err) => {
-                self.push_error(err.into());
-                Err(potential_error)
-            }
-        }
+        Parser { lexer }
     }
 
     fn advance_lexer(&mut self) {
         let _ = self.lexer.next_token();
     }
 
-    fn expect<E: Clone>(&mut self, expected: Token, potential_error: E) -> Result<Span, E> {
-        let next_st = self.next_token(potential_error.clone())?;
+    fn expect(&mut self, expected: Token) -> Result<Span, ParseError> {
+        let next_st = self.lexer.next_token()?;
         if next_st.token == expected {
             Ok(next_st.span)
         } else {
-            self.push_error(ParseError::UnexpectedToken {
+            Err(ParseError::UnexpectedToken {
                 expected,
                 got: next_st,
-            });
-            Err(potential_error)
+            })
         }
     }
 
-    pub fn parse_statement(&mut self) -> Result<pt::Statement, ()> {
-        let front_st = self.peek_token(())?;
+    pub fn parse_statement(&mut self) -> Result<pt::Statement, ParseError> {
+        let front_st = self.lexer.peek_token()?;
 
         match front_st.token {
             // Token::IfKeyword => self.parse_if_statement(),
@@ -99,12 +74,12 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
-    pub fn parse_block_statement(&mut self) -> Result<pt::Statement, ()> {
-        let left_bracket_span = self.expect(Token::LeftBracket, ())?;
+    pub fn parse_block_statement(&mut self) -> Result<pt::Statement, ParseError> {
+        let left_bracket_span = self.expect(Token::LeftBracket)?;
 
         let mut statements = Vec::new();
         loop {
-            let front_st = self.peek_token(())?;
+            let front_st = self.lexer.peek_token()?;
             if front_st.token != Token::RightBracket {
                 let stmt = self.parse_statement()?;
                 statements.push(stmt);
@@ -113,7 +88,7 @@ impl<'c, 's> Parser<'c, 's> {
             }
         }
 
-        let right_bracket_span = self.expect(Token::RightBracket, ())?;
+        let right_bracket_span = self.expect(Token::RightBracket)?;
         Ok(pt::Statement::Block(pt::BlockStatement {
             statements,
             left_bracket_span,
@@ -121,9 +96,10 @@ impl<'c, 's> Parser<'c, 's> {
         }))
     }
 
-    pub fn parse_print_statement(&mut self) -> Result<pt::Statement, ()> {
-        let print_keyword_span = self.expect(Token::PrintKeyword, ())?;
-        let (expression, semicolon_span) = self.parse_expression_statement_inner_sync()?;
+    pub fn parse_print_statement(&mut self) -> Result<pt::Statement, ParseError> {
+        let print_keyword_span = self.expect(Token::PrintKeyword)?;
+        let expression = self.parse_expression()?;
+        let semicolon_span = self.expect(Token::SemiColon)?;
         Ok(pt::Statement::Print(pt::PrintStatement {
             expression: Box::new(expression),
             print_keyword_span,
@@ -131,30 +107,16 @@ impl<'c, 's> Parser<'c, 's> {
         }))
     }
 
-    fn parse_expression_statement_inner_sync(&mut self) -> Result<(pt::Expression, Span), ()> {
-        match self.parse_expression() {
-            Ok(expr) => {
-                let semicolon_span = self.expect(Token::SemiColon, ())?;
-                Ok((expr, semicolon_span))
-            }
-            Err(ExpressionSyncCmd::MidExpression) => {
-                self.skip_to_next_semicolon();
-                Err(())
-            }
-            Err(ExpressionSyncCmd::EndOfExpression) => Err(()),
-        }
+    pub fn parse_expression_statement(&mut self) -> Result<pt::Statement, ParseError> {
+        let expression = self.parse_expression()?;
+        let semicolon_span = self.expect(Token::SemiColon)?;
+        Ok(pt::Statement::Expression(pt::ExpressionStatement {
+            expression: Some(Box::new(expression)),
+            semicolon_span,
+        }))
     }
 
-    fn skip_to_next_semicolon(&mut self) -> Option<Span> {
-        while let Ok(st) = self.next_token(()) {
-            if st.token == Token::SemiColon {
-                return Some(st.span);
-            }
-        }
-        None
-    }
-
-    pub fn parse_expression(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
+    pub fn parse_expression(&mut self) -> Result<pt::Expression, ParseError> {
         self.parse_logic_or()
     }
 
@@ -183,11 +145,11 @@ impl<'c, 's> Parser<'c, 's> {
         Token::Plus => pt::BinaryOperator::Add,
     );
 
-    fn parse_factor(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
+    fn parse_factor(&mut self) -> Result<pt::Expression, ParseError> {
         let mut lhs = self.parse_unary()?;
 
         loop {
-            let next_st = self.peek_token(ExpressionSyncCmd::MidExpression)?;
+            let next_st = self.lexer.peek_token()?;
             let operator = match next_st.token {
                 Token::Slash => pt::BinaryOperator::Divide,
                 Token::Star => pt::BinaryOperator::Multiply,
@@ -207,8 +169,8 @@ impl<'c, 's> Parser<'c, 's> {
         Ok(lhs)
     }
 
-    fn parse_unary(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
-        let front_st = self.peek_token(ExpressionSyncCmd::MidExpression)?;
+    fn parse_unary(&mut self) -> Result<pt::Expression, ParseError> {
+        let front_st = self.lexer.peek_token()?;
         match front_st.token {
             Token::Bang => {
                 self.advance_lexer();
@@ -232,8 +194,8 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
-    fn parse_primary(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
-        let front_st = self.next_token(ExpressionSyncCmd::MidExpression)?;
+    fn parse_primary(&mut self) -> Result<pt::Expression, ParseError> {
+        let front_st = self.lexer.next_token()?;
         match front_st.token {
             Token::NumberLiteral(value) => Ok(utils::build_literal(
                 tc::Literal::Number(value),
@@ -253,27 +215,19 @@ impl<'c, 's> Parser<'c, 's> {
                 span: front_st.span,
             })),
             Token::LeftParenthesis => self.continue_parse_parenthesis_expr(front_st.span),
-
-            other => {
-                self.push_error(ParseError::UnexpectedSyntax {
-                    msg: "Expected a literal, or `(`",
-                    got: front_st,
-                });
-                Err(if other == Token::SemiColon {
-                    ExpressionSyncCmd::EndOfExpression
-                } else {
-                    ExpressionSyncCmd::MidExpression
-                })
-            }
+            _ => Err(ParseError::UnexpectedSyntax {
+                msg: "Expected a literal, or `(`",
+                got: front_st,
+            }),
         }
     }
 
     fn continue_parse_parenthesis_expr(
         &mut self,
         left_span: Span,
-    ) -> Result<pt::Expression, ExpressionSyncCmd> {
+    ) -> Result<pt::Expression, ParseError> {
         let sub = self.parse_expression()?;
-        let right_span = self.expect(Token::RightParenthesis, ExpressionSyncCmd::MidExpression)?;
+        let right_span = self.expect(Token::RightParenthesis)?;
 
         Ok(pt::Expression::Parenthesis(pt::ParenthesisExpression {
             left_paren_span: left_span,
@@ -281,16 +235,6 @@ impl<'c, 's> Parser<'c, 's> {
             sub: Box::new(sub),
         }))
     }
-
-    pub fn push_error(&mut self, error: ParseError) {
-        self.errors.push(error);
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum ExpressionSyncCmd {
-    EndOfExpression,
-    MidExpression,
 }
 
 mod utils {
