@@ -1,4 +1,4 @@
-use crate::{lexer::Span, tree_common::IdentifierExpression};
+use crate::{lexer::Span, tree_common as tc};
 
 use super::{Expression, Statement};
 
@@ -11,7 +11,7 @@ pub enum Declaration {
 #[derive(Debug)]
 pub struct VarDeclaration {
     pub var_keyword_span: Span,
-    pub identifier: IdentifierExpression,
+    pub identifier: tc::IdentifierExpression,
     pub init: Option<VarInit>,
     pub semicolon_span: Span,
 }

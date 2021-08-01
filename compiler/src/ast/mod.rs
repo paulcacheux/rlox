@@ -5,6 +5,45 @@ pub mod eval;
 pub mod translate;
 
 #[derive(Debug)]
+pub struct Program {
+    pub statements: Vec<Statement>,
+}
+
+#[derive(Debug)]
+pub enum Statement {
+    VarDeclaration {
+        var_keyword_span: Span,
+        identifier: tc::IdentifierExpression,
+        init_expression: Box<Expression>,
+        equal_span: Span,
+        semicolon_span: Span,
+    },
+    Block {
+        declarations: Vec<Statement>,
+        left_bracket_span: Span,
+        right_bracket_span: Span,
+    },
+    If {
+        condition: Box<Expression>,
+        if_keyword_span: Span,
+        left_paren_span: Span,
+        right_paren_span: Span,
+        true_body: Box<Statement>,
+        else_keyword_span: Span,
+        false_body: Box<Statement>,
+    },
+    Print {
+        expression: Box<Expression>,
+        print_keyword_span: Span,
+        semicolon_span: Span,
+    },
+    Expression {
+        expression: Box<Expression>,
+        semicolon_span: Span,
+    },
+}
+
+#[derive(Debug)]
 pub enum Expression {
     LazyLogical(LazyLogicalExpression),
     Binary(BinaryExpression),
