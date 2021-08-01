@@ -22,7 +22,7 @@ pub struct IdentifierExpression {
     pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOperator {
     LogicalNot,
     Minus,

@@ -1,6 +1,7 @@
 use crate::lexer::Span;
 use crate::tree_common as tc;
 
+pub mod eval;
 pub mod translate;
 
 #[derive(Debug)]
@@ -34,7 +35,7 @@ pub struct BinaryExpression {
     pub rhs: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryOperator {
     NotEqual,
     Equal,

@@ -25,7 +25,7 @@ pub struct BinaryExpression {
     pub rhs: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryOperator {
     LogicalAnd,
     LogicalOr,
