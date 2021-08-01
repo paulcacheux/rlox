@@ -1,5 +1,5 @@
 use compiler::{
-    ast::eval::{self, Evaluator},
+    ast_eval::{self, Evaluator},
     lexer::Lexer,
     parse_tree as pt,
     parser::Parser,
@@ -118,10 +118,10 @@ fn test_expression_simple_eval() {
         .expect("Failed to compute expression value");
 
     let expr_value_str: Cow<str> = match expr_value {
-        eval::Value::Nil => "nil".into(),
-        eval::Value::Number(value) => value.to_string().into(),
-        eval::Value::Bool(value) => value.to_string().into(),
-        eval::Value::String(sym) => context.resolve_str_symbol(sym).into(),
+        ast_eval::Value::Nil => "nil".into(),
+        ast_eval::Value::Number(value) => value.to_string().into(),
+        ast_eval::Value::Bool(value) => value.to_string().into(),
+        ast_eval::Value::String(sym) => context.resolve_str_symbol(sym).into(),
     };
 
     assert_eq!(expected, expr_value_str);

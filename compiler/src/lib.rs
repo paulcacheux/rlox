@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use string_interner::{DefaultSymbol, StringInterner};
 
 pub mod ast;
+pub mod ast_eval;
 pub mod lexer;
 pub mod parse_tree;
 pub mod parser;

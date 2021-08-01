@@ -1,8 +1,6 @@
 use crate::lexer::Span;
 use crate::tree_common as tc;
 
-pub mod eval;
-
 #[derive(Debug)]
 pub struct Program {
     pub statements: Vec<Statement>,

@@ -1,15 +1,105 @@
-use crate::{ast, lexer::Span, tree_common as tc, CompilationContext};
-use std::fmt;
-use string_interner::DefaultSymbol;
+use std::sync::Arc;
+
+use crate::{ast, tree_common as tc, CompilationContext};
+
+mod env;
+mod error;
+mod value;
+pub use env::Environment;
+pub use error::EvalError;
+pub use value::Value;
 
 #[derive(Debug)]
 pub struct Evaluator<'c> {
     context: &'c CompilationContext,
+    current_env: Arc<Environment>,
 }
 
 impl<'c> Evaluator<'c> {
     pub fn new(context: &'c CompilationContext) -> Self {
-        Evaluator { context }
+        let current_env = Environment::new();
+
+        Evaluator {
+            context,
+            current_env,
+        }
+    }
+
+    fn begin_env(&mut self) {
+        self.current_env = Environment::with_parent(self.current_env.clone());
+    }
+
+    fn end_env(&mut self) {
+        self.current_env = self
+            .current_env
+            .clone()
+            .into_parent()
+            .expect("Failed to switch to parent env");
+    }
+
+    pub fn value_to_str(&self, value: Value) -> String {
+        match value {
+            Value::Nil => "nil".into(),
+            Value::Number(value) => value.to_string(),
+            Value::Bool(value) => value.to_string(),
+            Value::String(sym) => self.context.resolve_str_symbol(sym),
+        }
+    }
+
+    pub fn eval_program(&mut self, prog: &ast::Program) -> Result<(), EvalError> {
+        // top level env is already setup
+        for stmt in &prog.statements {
+            self.eval_statement(stmt)?;
+        }
+        Ok(())
+    }
+
+    pub fn eval_statement(&mut self, stmt: &ast::Statement) -> Result<(), EvalError> {
+        match stmt {
+            ast::Statement::VarDeclaration {
+                identifier,
+                init_expression,
+                ..
+            } => {
+                let init_value = self.eval_expression(init_expression)?;
+                self.current_env
+                    .define_variable(identifier.identifier, init_value);
+                Ok(())
+            }
+            ast::Statement::Block { statements, .. } => {
+                self.begin_env();
+                for stmt in statements {
+                    self.eval_statement(stmt)?;
+                }
+                self.end_env();
+                Ok(())
+            }
+            ast::Statement::If {
+                condition,
+                true_body,
+                false_body,
+                ..
+            } => {
+                let condition_value = self.eval_expression(condition)?;
+                if condition_value.to_bool() {
+                    self.eval_statement(true_body)?;
+                } else {
+                    self.eval_statement(false_body)?;
+                }
+                Ok(())
+            }
+            ast::Statement::Print { expression, .. } => {
+                let print_value = self.eval_expression(expression)?;
+                println!("{}", self.value_to_str(print_value));
+                Ok(())
+            }
+            ast::Statement::Expression { expression, .. } => {
+                if let Some(expr) = expression {
+                    self.eval_expression(expr)?;
+                }
+                Ok(())
+            }
+        }
     }
 
     pub fn eval_expression(&mut self, expr: &ast::Expression) -> Result<Value, EvalError> {
@@ -23,7 +113,20 @@ impl<'c> Evaluator<'c> {
                 tc::Literal::Bool(value) => Ok(Value::Bool(value)),
                 tc::Literal::Nil => Ok(Value::Nil),
             },
-            ast::Expression::Identifier(_) => todo!(),
+            ast::Expression::Identifier(ident) => {
+                if let Some(value) = self.current_env.get_value(&ident.identifier) {
+                    Ok(value)
+                } else {
+                    Err(EvalError {
+                        msg: format!(
+                            "Undefined identifier `{}`",
+                            self.context.resolve_str_symbol(ident.identifier)
+                        )
+                        .into(),
+                        span: ident.span,
+                    })
+                }
+            }
         }
     }
 
@@ -65,7 +168,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::String(res_sym))
             }
             (ast::BinaryOperator::Add, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers or two strings",
+                msg: "Operands must be two numbers or two strings".into(),
                 span: expr.operator_span,
             }),
 
@@ -73,7 +176,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Number(a - b))
             }
             (ast::BinaryOperator::Substract, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -81,7 +184,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Number(a * b))
             }
             (ast::BinaryOperator::Multiply, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -89,7 +192,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Number(a / b))
             }
             (ast::BinaryOperator::Divide, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -97,7 +200,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Bool(a < b))
             }
             (ast::BinaryOperator::LessThan, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -105,7 +208,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Bool(a <= b))
             }
             (ast::BinaryOperator::LessOrEqual, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -113,7 +216,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Bool(a > b))
             }
             (ast::BinaryOperator::GreaterThan, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -121,7 +224,7 @@ impl<'c> Evaluator<'c> {
                 Ok(Value::Bool(a >= b))
             }
             (ast::BinaryOperator::GreaterOrEqual, _, _) => Err(EvalError {
-                msg: "Operands must be two numbers",
+                msg: "Operands must be two numbers".into(),
                 span: expr.operator_span,
             }),
 
@@ -136,42 +239,14 @@ impl<'c> Evaluator<'c> {
         match (expr.operator, sub) {
             (tc::UnaryOperator::Minus, Value::Number(a)) => Ok(Value::Number(-a)),
             (tc::UnaryOperator::Minus, _) => Err(EvalError {
-                msg: "Operand must be a number",
+                msg: "Operand must be a number".into(),
                 span: expr.operator_span,
             }),
             (tc::UnaryOperator::LogicalNot, Value::Bool(b)) => Ok(Value::Bool(!b)),
             (tc::UnaryOperator::LogicalNot, _) => Err(EvalError {
-                msg: "Operand must be a boolean",
+                msg: "Operand must be a boolean".into(),
                 span: expr.operator_span,
             }),
         }
     }
 }
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Value {
-    Nil,
-    Number(f64),
-    Bool(bool),
-    String(DefaultSymbol),
-}
-
-impl Value {
-    fn to_bool(self) -> bool {
-        !matches!(self, Value::Nil | Value::Bool(false))
-    }
-}
-
-#[derive(Debug)]
-pub struct EvalError {
-    pub msg: &'static str,
-    pub span: Span,
-}
-
-impl fmt::Display for EvalError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[span: {:?}] {}", self.span, self.msg)
-    }
-}
-
-impl std::error::Error for EvalError {}
