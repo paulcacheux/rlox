@@ -138,15 +138,20 @@ impl<'c, 's> Parser<'c, 's> {
                 Ok((expr, semicolon_span))
             }
             Err(ExpressionSyncCmd::MidExpression) => {
-                while let Ok(st) = self.next_token(()) {
-                    if st.token == Token::SemiColon {
-                        break;
-                    }
-                }
+                self.skip_to_next_semicolon();
                 Err(())
             }
             Err(ExpressionSyncCmd::EndOfExpression) => Err(()),
         }
+    }
+
+    fn skip_to_next_semicolon(&mut self) -> Option<Span> {
+        while let Ok(st) = self.next_token(()) {
+            if st.token == Token::SemiColon {
+                return Some(st.span);
+            }
+        }
+        None
     }
 
     pub fn parse_expression(&mut self) -> Result<pt::Expression, ExpressionSyncCmd> {
