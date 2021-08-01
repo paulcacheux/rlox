@@ -89,17 +89,53 @@ impl<'c, 's> Parser<'c, 's> {
     }
 
     pub fn parse_statement(&mut self) -> Result<pt::Statement, ()> {
-        unimplemented!()
+        let front_st = self.peek_token(())?;
+
+        match front_st.token {
+            // Token::IfKeyword => self.parse_if_statement(),
+            Token::PrintKeyword => self.parse_print_statement(),
+            Token::LeftBracket => self.parse_block_statement(),
+            _ => todo!(),
+        }
     }
 
-    pub fn parse_expression_statement(&mut self) -> Result<pt::Statement, ()> {
+    pub fn parse_block_statement(&mut self) -> Result<pt::Statement, ()> {
+        let left_bracket_span = self.expect(Token::LeftBracket, ())?;
+
+        let mut statements = Vec::new();
+        loop {
+            let front_st = self.peek_token(())?;
+            if front_st.token != Token::RightBracket {
+                let stmt = self.parse_statement()?;
+                statements.push(stmt);
+            } else {
+                break;
+            }
+        }
+
+        let right_bracket_span = self.expect(Token::RightBracket, ())?;
+        Ok(pt::Statement::Block(pt::BlockStatement {
+            statements,
+            left_bracket_span,
+            right_bracket_span,
+        }))
+    }
+
+    pub fn parse_print_statement(&mut self) -> Result<pt::Statement, ()> {
+        let print_keyword_span = self.expect(Token::PrintKeyword, ())?;
+        let (expression, semicolon_span) = self.parse_expression_statement_inner_sync()?;
+        Ok(pt::Statement::Print(pt::PrintStatement {
+            expression: Box::new(expression),
+            print_keyword_span,
+            semicolon_span,
+        }))
+    }
+
+    fn parse_expression_statement_inner_sync(&mut self) -> Result<(pt::Expression, Span), ()> {
         match self.parse_expression() {
             Ok(expr) => {
                 let semicolon_span = self.expect(Token::SemiColon, ())?;
-                Ok(pt::Statement::Expression(pt::ExpressionStatement {
-                    expression: Some(Box::new(expr)),
-                    semicolon_span,
-                }))
+                Ok((expr, semicolon_span))
             }
             Err(ExpressionSyncCmd::MidExpression) => {
                 while let Ok(st) = self.next_token(()) {
