@@ -63,18 +63,109 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
+    pub fn parse_program(&mut self) -> Result<pt::Program, ParseError> {
+        let mut declarations = Vec::new();
+        loop {
+            let front_st = self.lexer.peek_token()?;
+            if front_st.token == Token::EndOfFile {
+                break;
+            }
+
+            let decl = self.parse_declaration()?;
+            declarations.push(decl);
+        }
+
+        Ok(pt::Program { declarations })
+    }
+
+    pub fn parse_declaration(&mut self) -> Result<pt::Declaration, ParseError> {
+        let front_st = self.lexer.peek_token()?;
+        let decl = match front_st.token {
+            Token::VarKeyword => pt::Declaration::Var(self.parse_var_declaration()?),
+            _ => pt::Declaration::Statement(self.parse_statement()?),
+        };
+        Ok(decl)
+    }
+
+    fn parse_var_declaration(&mut self) -> Result<pt::VarDeclaration, ParseError> {
+        let var_keyword_span = self.expect(Token::VarKeyword)?;
+
+        let front_st = self.lexer.next_token()?;
+        let identifier = if let Token::Identifier(identifier) = front_st.token {
+            tc::IdentifierExpression {
+                identifier,
+                span: front_st.span,
+            }
+        } else {
+            return Err(ParseError::UnexpectedSyntax {
+                msg: "Expected identifier",
+                got: front_st,
+            });
+        };
+
+        let front_st = self.lexer.peek_token()?;
+        let init = if front_st.token == Token::Equal {
+            let equal_span = self.expect(Token::Equal)?;
+            let expression = self.parse_expression()?;
+            Some(pt::VarInit {
+                expression: Box::new(expression),
+                equal_span,
+            })
+        } else {
+            None
+        };
+
+        let semicolon_span = self.expect(Token::SemiColon)?;
+        Ok(pt::VarDeclaration {
+            var_keyword_span,
+            identifier,
+            init,
+            semicolon_span,
+        })
+    }
+
     pub fn parse_statement(&mut self) -> Result<pt::Statement, ParseError> {
         let front_st = self.lexer.peek_token()?;
 
-        match front_st.token {
-            // Token::IfKeyword => self.parse_if_statement(),
-            Token::PrintKeyword => self.parse_print_statement(),
-            Token::LeftBracket => self.parse_block_statement(),
-            _ => todo!(),
-        }
+        let stmt = match front_st.token {
+            Token::IfKeyword => pt::Statement::If(self.parse_if_statement()?),
+            Token::PrintKeyword => pt::Statement::Print(self.parse_print_statement()?),
+            Token::LeftBracket => pt::Statement::Block(self.parse_block_statement()?),
+            _ => pt::Statement::Expression(self.parse_expression_statement()?),
+        };
+        Ok(stmt)
     }
 
-    pub fn parse_block_statement(&mut self) -> Result<pt::Statement, ParseError> {
+    pub fn parse_if_statement(&mut self) -> Result<pt::IfStatement, ParseError> {
+        let if_keyword_span = self.expect(Token::IfKeyword)?;
+        let left_paren_span = self.expect(Token::LeftParenthesis)?;
+        let condition = self.parse_expression()?;
+        let right_paren_span = self.expect(Token::RightParenthesis)?;
+        let body = self.parse_statement()?;
+
+        let front_st = self.lexer.peek_token()?;
+        let else_statement = if front_st.token == Token::ElseKeyword {
+            let else_keyword_span = self.expect(Token::ElseKeyword)?;
+            let body = self.parse_statement()?;
+            Some(pt::ElseStatement {
+                else_keyword_span,
+                body: Box::new(body),
+            })
+        } else {
+            None
+        };
+
+        Ok(pt::IfStatement {
+            condition: Box::new(condition),
+            if_keyword_span,
+            left_paren_span,
+            right_paren_span,
+            body: Box::new(body),
+            else_statement,
+        })
+    }
+
+    pub fn parse_block_statement(&mut self) -> Result<pt::BlockStatement, ParseError> {
         let left_bracket_span = self.expect(Token::LeftBracket)?;
 
         let mut statements = Vec::new();
@@ -89,31 +180,31 @@ impl<'c, 's> Parser<'c, 's> {
         }
 
         let right_bracket_span = self.expect(Token::RightBracket)?;
-        Ok(pt::Statement::Block(pt::BlockStatement {
+        Ok(pt::BlockStatement {
             statements,
             left_bracket_span,
             right_bracket_span,
-        }))
+        })
     }
 
-    pub fn parse_print_statement(&mut self) -> Result<pt::Statement, ParseError> {
+    pub fn parse_print_statement(&mut self) -> Result<pt::PrintStatement, ParseError> {
         let print_keyword_span = self.expect(Token::PrintKeyword)?;
         let expression = self.parse_expression()?;
         let semicolon_span = self.expect(Token::SemiColon)?;
-        Ok(pt::Statement::Print(pt::PrintStatement {
+        Ok(pt::PrintStatement {
             expression: Box::new(expression),
             print_keyword_span,
             semicolon_span,
-        }))
+        })
     }
 
-    pub fn parse_expression_statement(&mut self) -> Result<pt::Statement, ParseError> {
+    pub fn parse_expression_statement(&mut self) -> Result<pt::ExpressionStatement, ParseError> {
         let expression = self.parse_expression()?;
         let semicolon_span = self.expect(Token::SemiColon)?;
-        Ok(pt::Statement::Expression(pt::ExpressionStatement {
+        Ok(pt::ExpressionStatement {
             expression: Some(Box::new(expression)),
             semicolon_span,
-        }))
+        })
     }
 
     pub fn parse_expression(&mut self) -> Result<pt::Expression, ParseError> {

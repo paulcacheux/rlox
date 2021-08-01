@@ -1,9 +1,4 @@
-use compiler::{
-    ast::{self, eval::Evaluator},
-    lexer::Lexer,
-    parser::Parser,
-    CompilationContext,
-};
+use compiler::{lexer::Lexer, parser::Parser, CompilationContext};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input_path = std::env::args().nth(1).expect("Failed to get input path");
@@ -14,17 +9,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut parser = Parser::new(lexer.peekable());
 
-    let expr = parser
-        .parse_expression()
-        .expect("Failed to parse expression");
+    let expr = parser.parse_program().expect("Failed to parse program");
 
-    let ast_expr = ast::translate::build_ast_expression(expr);
+    // let ast_expr = ast::translate::build_ast_expression(expr);
 
-    let mut evaluator = Evaluator::new(&context);
-    let res = evaluator.eval_expression(&ast_expr)?;
+    // let mut evaluator = Evaluator::new(&context);
+    // let res = evaluator.eval_expression(&ast_expr)?;
 
-    println!("{:#?}", ast_expr);
-    println!("{:#?}", res);
+    println!("{:#?}", expr);
 
     Ok(())
 }
