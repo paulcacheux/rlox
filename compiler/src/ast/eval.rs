@@ -158,10 +158,7 @@ pub enum Value {
 
 impl Value {
     fn to_bool(self) -> bool {
-        match self {
-            Value::Nil | Value::Bool(false) => false,
-            _ => true,
-        }
+        !matches!(self, Value::Nil | Value::Bool(false))
     }
 }
 
