@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use crate::{ast, tree_common as tc, CompilationContext};
 
@@ -10,18 +10,20 @@ pub use error::EvalError;
 pub use value::Value;
 
 #[derive(Debug)]
-pub struct Evaluator<'c> {
+pub struct Evaluator<'c, W: Write> {
     context: &'c CompilationContext,
     current_env: Arc<Environment>,
+    stdout: W,
 }
 
-impl<'c> Evaluator<'c> {
-    pub fn new(context: &'c CompilationContext) -> Self {
+impl<'c, W: Write> Evaluator<'c, W> {
+    pub fn new(context: &'c CompilationContext, stdout: W) -> Self {
         let current_env = Environment::new();
 
         Evaluator {
             context,
             current_env,
+            stdout,
         }
     }
 
@@ -90,7 +92,8 @@ impl<'c> Evaluator<'c> {
             }
             ast::Statement::Print { expression, .. } => {
                 let print_value = self.eval_expression(expression)?;
-                println!("{}", self.value_to_str(print_value));
+                writeln!(self.stdout, "{}", self.value_to_str(print_value))
+                    .expect("Failed to write to stdout");
                 Ok(())
             }
             ast::Statement::Expression { expression, .. } => {

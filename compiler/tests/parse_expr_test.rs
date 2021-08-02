@@ -1,15 +1,8 @@
 use compiler::{
-    ast_eval::{self, Evaluator},
-    lexer::Lexer,
-    parse_tree as pt,
-    parser::Parser,
-    pt2ast::Translator,
+    ast_eval::Evaluator, lexer::Lexer, parse_tree as pt, parser::Parser, pt2ast::Translator,
     tree_common as tc, CompilationContext,
 };
-use std::{
-    borrow::Cow,
-    io::{BufRead, BufReader},
-};
+use std::io::{BufRead, BufReader};
 
 fn test_debug_binary_operator(op: &pt::BinaryOperator) -> &'static str {
     match op {
@@ -112,17 +105,14 @@ fn test_expression_simple_eval() {
     let mut translator = Translator::new(&context);
     let expr = translator.translate_expression(expr);
 
-    let mut evaluator = Evaluator::new(&context);
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    let mut evaluator = Evaluator::new(&context, &mut stdout);
     let expr_value = evaluator
         .eval_expression(&expr)
         .expect("Failed to compute expression value");
 
-    let expr_value_str: Cow<str> = match expr_value {
-        ast_eval::Value::Nil => "nil".into(),
-        ast_eval::Value::Number(value) => value.to_string().into(),
-        ast_eval::Value::Bool(value) => value.to_string().into(),
-        ast_eval::Value::String(sym) => context.resolve_str_symbol(sym).into(),
-    };
+    let expr_value_str = evaluator.value_to_str(expr_value);
 
     assert_eq!(expected, expr_value_str);
 }

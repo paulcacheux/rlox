@@ -18,14 +18,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .translate_program(program)
         .expect("Failed to translate parse tree to AST");
 
-    // let ast_expr = ast::translate::build_ast_expression(expr);
+    // println!("{:#?}", program);
 
-    // let mut evaluator = Evaluator::new(&context);
-    // let res = evaluator.eval_expression(&ast_expr)?;
-
-    println!("{:#?}", program);
-
-    let mut evaluator = Evaluator::new(&context);
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    let mut evaluator = Evaluator::new(&context, &mut stdout);
     evaluator
         .eval_program(&program)
         .expect("Failed to eval program");
