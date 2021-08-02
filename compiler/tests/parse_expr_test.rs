@@ -1,8 +1,9 @@
 use compiler::{
-    ast_eval::Evaluator, lexer::Lexer, parse_tree as pt, parser::Parser, pt2ast::Translator,
-    tree_common as tc, CompilationContext,
+    ast_eval::Evaluator, parse_tree as pt, pt2ast::Translator, tree_common as tc,
+    CompilationContext,
 };
-use std::io::{BufRead, BufReader};
+
+pub mod utils;
 
 fn test_debug_binary_operator(op: &pt::BinaryOperator) -> &'static str {
     match op {
@@ -56,51 +57,23 @@ fn test_debug_expr(ctx: &CompilationContext, expr: &pt::Expression) -> String {
     }
 }
 
-fn extract_expect(path: &str) -> String {
-    const EXPECT_PREFIX: &str = "// expect: ";
-
-    let test_desc_file = std::fs::File::open(path).expect("Failed to open test description file");
-    let reader = BufReader::new(test_desc_file);
-
-    for line in reader.lines() {
-        let line = line.expect("Failed to read line");
-
-        if line.starts_with(EXPECT_PREFIX) {
-            return line.trim_start_matches(EXPECT_PREFIX).to_owned();
-        }
-    }
-
-    panic!("Failed to exctract expect from test description file")
-}
-
-fn parse_expression(context: &CompilationContext, path: &str) -> pt::Expression {
-    let input_content = std::fs::read_to_string(path).expect("Failed to read input file");
-
-    let lexer = Lexer::new(&context, &input_content);
-    let mut parser = Parser::new(lexer.peekable());
-
-    parser
-        .parse_expression()
-        .expect("Failed to parse expression")
-}
-
 #[test]
 fn test_expression_parse_tree() {
     const INPUT_PATH: &str = "./../testsuite/expressions/parse.lox";
-    let expected = extract_expect(INPUT_PATH);
+    let expected = utils::extract_expect(INPUT_PATH);
 
     let context = CompilationContext::default();
-    let expr = parse_expression(&context, INPUT_PATH);
-    assert_eq!(expected, test_debug_expr(&context, &expr));
+    let expr = utils::parse_expression(&context, INPUT_PATH);
+    assert_eq!(expected, test_debug_expr(&context, &expr) + "\n");
 }
 
 #[test]
 fn test_expression_simple_eval() {
     const INPUT_PATH: &str = "./../testsuite/expressions/evaluate.lox";
-    let expected = extract_expect(INPUT_PATH);
+    let expected = utils::extract_expect(INPUT_PATH);
 
     let context = CompilationContext::default();
-    let expr = parse_expression(&context, INPUT_PATH);
+    let expr = utils::parse_expression(&context, INPUT_PATH);
 
     let mut translator = Translator::new(&context);
     let expr = translator.translate_expression(expr);
@@ -112,7 +85,7 @@ fn test_expression_simple_eval() {
         .eval_expression(&expr)
         .expect("Failed to compute expression value");
 
-    let expr_value_str = evaluator.value_to_str(expr_value);
+    let expr_value_str = evaluator.value_to_str(expr_value) + "\n";
 
     assert_eq!(expected, expr_value_str);
 }
