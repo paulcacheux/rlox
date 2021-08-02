@@ -197,7 +197,7 @@ where
             Some((pos, '-')) => SpannedToken::single_char(Token::Minus, pos),
 
             Some((pos, '=')) => self.emit_if_next('=', Token::EqualEqual, Token::Equal, pos),
-            Some((pos, '!')) => self.emit_if_next('=', Token::BangEqual, Token::Equal, pos),
+            Some((pos, '!')) => self.emit_if_next('=', Token::BangEqual, Token::Bang, pos),
             Some((pos, '<')) => self.emit_if_next('=', Token::LessOrEqual, Token::LessThan, pos),
             Some((pos, '>')) => {
                 self.emit_if_next('=', Token::GreaterOrEqual, Token::GreaterThan, pos)
