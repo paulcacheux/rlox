@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 static EXPECT_COMPILE_ERROR: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"// \[line (\d+)\] Error:").expect("Failed to compile regex"));
+    Lazy::new(|| Regex::new(r"// \[line (\d+)\] Error").expect("Failed to compile regex"));
 
 #[macro_export]
 macro_rules! extract_enum_value {

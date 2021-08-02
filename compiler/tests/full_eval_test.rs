@@ -53,6 +53,14 @@ fn test_expression_full_eval_comments(input_path: &str) {
     inner_eval_test(input_path)
 }
 
+#[test_resources("testsuite/if/*.lox")]
+fn test_expression_full_eval_if(input_path: &str) {
+    if input_path.contains("var") || input_path.contains("class") {
+        return; // skip unimplemented stuff
+    }
+    inner_eval_test(input_path)
+}
+
 #[test_resources("testsuite/nil/*.lox")]
 fn test_expression_full_eval_nil(input_path: &str) {
     inner_eval_test(input_path)
