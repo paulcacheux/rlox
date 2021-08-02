@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::lexer::Span;
+use crate::{lexer::Span, ErrorSpannable};
 
 #[derive(Debug)]
 pub enum SemanticError {
@@ -26,3 +26,13 @@ impl fmt::Display for SemanticError {
 }
 
 impl std::error::Error for SemanticError {}
+
+impl ErrorSpannable for SemanticError {
+    fn span(&self) -> Span {
+        match self {
+            SemanticError::IdentifierAlreadyDefined {
+                identifier_span, ..
+            } => *identifier_span,
+        }
+    }
+}

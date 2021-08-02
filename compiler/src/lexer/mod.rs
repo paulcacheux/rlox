@@ -11,7 +11,7 @@ pub use peekable::PeekableLexer;
 pub use span::{Span, SpannedToken};
 pub use token::Token;
 
-use crate::CompilationContext;
+use crate::{CompilationContext, ErrorSpannable};
 
 #[derive(Debug, Clone)]
 pub struct Lexer<'c, I>
@@ -227,6 +227,18 @@ fn is_identifier_continue(c: char) -> bool {
 pub enum LexerError {
     UnexpectedChar { c: char, pos: usize },
     NumberParseError { span: Span },
+}
+
+impl ErrorSpannable for LexerError {
+    fn span(&self) -> Span {
+        match self {
+            LexerError::UnexpectedChar { pos, .. } => Span {
+                begin: *pos,
+                end: pos + 1,
+            },
+            LexerError::NumberParseError { span } => *span,
+        }
+    }
 }
 
 impl fmt::Display for LexerError {

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, fmt};
 
-use crate::lexer::Span;
+use crate::{lexer::Span, ErrorSpannable};
 
 #[derive(Debug)]
 pub struct EvalError {
@@ -15,3 +15,9 @@ impl fmt::Display for EvalError {
 }
 
 impl std::error::Error for EvalError {}
+
+impl ErrorSpannable for EvalError {
+    fn span(&self) -> Span {
+        self.span
+    }
+}

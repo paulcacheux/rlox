@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 
+use lexer::Span;
 use string_interner::{DefaultSymbol, StringInterner};
 
 pub mod ast;
@@ -28,4 +29,8 @@ impl CompilationContext {
             .map(|s| s.to_owned())
             .expect("Resolve unexisting symbol")
     }
+}
+
+pub trait ErrorSpannable: std::error::Error {
+    fn span(&self) -> Span;
 }

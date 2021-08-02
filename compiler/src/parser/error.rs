@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::lexer::{LexerError, SpannedToken, Token};
+use crate::{
+    lexer::{LexerError, Span, SpannedToken, Token},
+    ErrorSpannable,
+};
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -13,6 +16,16 @@ pub enum ParseError {
         msg: &'static str,
         got: SpannedToken,
     },
+}
+
+impl ErrorSpannable for ParseError {
+    fn span(&self) -> Span {
+        match self {
+            ParseError::LexerError(lex) => lex.span(),
+            ParseError::UnexpectedToken { got, .. } => got.span,
+            ParseError::UnexpectedSyntax { got, .. } => got.span,
+        }
+    }
 }
 
 impl fmt::Display for ParseError {

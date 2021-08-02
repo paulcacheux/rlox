@@ -60,20 +60,26 @@ fn test_debug_expr(ctx: &CompilationContext, expr: &pt::Expression) -> String {
 #[test]
 fn test_expression_parse_tree() {
     const INPUT_PATH: &str = "./../testsuite/expressions/parse.lox";
-    let expected = extract_enum_value!(utils::extract_expect(INPUT_PATH), utils::ExpectInfo::Output(output) => output);
+    let input_content =
+        std::fs::read_to_string(INPUT_PATH).expect("Failed to read test input file content");
+
+    let expected = extract_enum_value!(utils::extract_expect(&input_content), utils::ExpectInfo::Output(output) => output);
 
     let context = CompilationContext::default();
-    let expr = utils::parse_expression(&context, INPUT_PATH);
+    let expr = utils::parse_expression(&context, &input_content);
     assert_eq!(expected, test_debug_expr(&context, &expr) + "\n");
 }
 
 #[test]
 fn test_expression_simple_eval() {
     const INPUT_PATH: &str = "./../testsuite/expressions/evaluate.lox";
-    let expected = extract_enum_value!(utils::extract_expect(INPUT_PATH), utils::ExpectInfo::Output(output) => output);
+    let input_content =
+        std::fs::read_to_string(INPUT_PATH).expect("Failed to read test input file content");
+
+    let expected = extract_enum_value!(utils::extract_expect(&input_content), utils::ExpectInfo::Output(output) => output);
 
     let context = CompilationContext::default();
-    let expr = utils::parse_expression(&context, INPUT_PATH);
+    let expr = utils::parse_expression(&context, &&input_content);
 
     let mut translator = Translator::new(&context);
     let expr = translator.translate_expression(expr);

@@ -1,10 +1,10 @@
-use std::{
-    io::{BufRead, BufReader},
-    path::Path,
-};
-
 use compiler::{
-    ast, lexer::Lexer, parse_tree as pt, parser::Parser, pt2ast::Translator, CompilationContext,
+    ast,
+    lexer::{Lexer, Span},
+    parse_tree as pt,
+    parser::Parser,
+    pt2ast::Translator,
+    CompilationContext, ErrorSpannable,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -29,18 +29,13 @@ pub enum ExpectInfo {
     RuntimeError,
 }
 
-pub fn extract_expect<P: AsRef<Path>>(path: P) -> ExpectInfo {
+pub fn extract_expect(test_desc_input: &str) -> ExpectInfo {
     const EXPECT_PREFIX: &str = "// expect: ";
     const EXPECT_RUNTIME_ERROR_PREFIX: &str = "// expect runtime error: ";
 
-    let test_desc_file = std::fs::File::open(path).expect("Failed to open test description file");
-    let reader = BufReader::new(test_desc_file);
-
     let mut res = String::new();
 
-    for line in reader.lines() {
-        let line = line.expect("Failed to read line");
-
+    for line in test_desc_input.lines() {
         if let Some(pat_start) = line.find(EXPECT_PREFIX) {
             let rest_start = pat_start + EXPECT_PREFIX.len();
             res.push_str(&line[rest_start..]);
@@ -52,19 +47,17 @@ pub fn extract_expect<P: AsRef<Path>>(path: P) -> ExpectInfo {
         }
 
         if let Some(captures) = EXPECT_COMPILE_ERROR.captures(&line) {
-            let _line: usize = captures[1]
+            let line = captures[1]
                 .parse()
                 .expect("Failed to parse compile error line");
-            return ExpectInfo::CompileError { line: 0 };
+            return ExpectInfo::CompileError { line };
         }
     }
 
     ExpectInfo::Output(res)
 }
 
-pub fn parse_expression<P: AsRef<Path>>(context: &CompilationContext, path: P) -> pt::Expression {
-    let input_content = std::fs::read_to_string(path).expect("Failed to read input file");
-
+pub fn parse_expression(context: &CompilationContext, input_content: &str) -> pt::Expression {
     let lexer = Lexer::new(&context, &input_content);
     let mut parser = Parser::new(lexer.peekable());
 
@@ -73,12 +66,10 @@ pub fn parse_expression<P: AsRef<Path>>(context: &CompilationContext, path: P) -
         .expect("Failed to parse expression")
 }
 
-pub fn parse_program<P: AsRef<Path>>(
+pub fn parse_program(
     context: &CompilationContext,
-    path: P,
-) -> Result<ast::Program, Box<dyn std::error::Error>> {
-    let input_content = std::fs::read_to_string(path).expect("Failed to read input file");
-
+    input_content: &str,
+) -> Result<ast::Program, CompileError> {
     let lexer = Lexer::new(&context, &input_content);
     let mut parser = Parser::new(lexer.peekable());
 
@@ -86,4 +77,32 @@ pub fn parse_program<P: AsRef<Path>>(
 
     let mut translator = Translator::new(&context);
     Ok(translator.translate_program(program)?)
+}
+
+pub struct CompileError {
+    pub span: Span,
+}
+
+impl<E> From<E> for CompileError
+where
+    E: ErrorSpannable,
+{
+    fn from(err: E) -> Self {
+        CompileError { span: err.span() }
+    }
+}
+
+impl CompileError {
+    pub fn get_line(&self, content: &str) -> usize {
+        let mut line = 1;
+        for (index, c) in content.char_indices() {
+            if index >= self.span.begin {
+                return line;
+            }
+            if c == '\n' {
+                line += 1;
+            }
+        }
+        line // Mostly EOF
+    }
 }
