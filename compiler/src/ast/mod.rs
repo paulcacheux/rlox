@@ -42,11 +42,34 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub enum Expression {
+    AssignExpression(AssignExpression),
     LazyLogical(LazyLogicalExpression),
     Binary(BinaryExpression),
     Unary(UnaryExpression),
     Literal(tc::LiteralExpression),
     Identifier(tc::IdentifierExpression),
+}
+
+impl Expression {
+    pub fn into_assign(self) -> Option<AssignExpressionLhs> {
+        if let Expression::Identifier(ident) = self {
+            Some(AssignExpressionLhs::Identifier(ident))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum AssignExpressionLhs {
+    Identifier(tc::IdentifierExpression),
+}
+
+#[derive(Debug)]
+pub struct AssignExpression {
+    pub equal_span: Span,
+    pub lhs: Box<AssignExpressionLhs>,
+    pub rhs: Box<Expression>,
 }
 
 #[derive(Debug)]

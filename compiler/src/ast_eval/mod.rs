@@ -107,6 +107,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
     pub fn eval_expression(&mut self, expr: &ast::Expression) -> Result<Value, EvalError> {
         match expr {
+            ast::Expression::AssignExpression(assign) => self.eval_assign_expression(assign),
             ast::Expression::LazyLogical(inner) => self.eval_lazyop_expression(inner),
             ast::Expression::Binary(inner) => self.eval_binop_expression(inner),
             ast::Expression::Unary(inner) => self.eval_unaryop_expression(inner),
@@ -128,6 +129,27 @@ impl<'c, W: Write> Evaluator<'c, W> {
                         .into(),
                         span: ident.span,
                     })
+                }
+            }
+        }
+    }
+
+    fn eval_assign_expression(&mut self, expr: &ast::AssignExpression) -> Result<Value, EvalError> {
+        let rhs = self.eval_expression(&expr.rhs)?;
+
+        match &*expr.lhs {
+            ast::AssignExpressionLhs::Identifier(ident) => {
+                if !self.current_env.set_variable(ident.identifier, rhs) {
+                    Err(EvalError {
+                        msg: format!(
+                            "Variable `{}` is not defined",
+                            self.context.resolve_str_symbol(ident.identifier)
+                        )
+                        .into(),
+                        span: ident.span,
+                    })
+                } else {
+                    Ok(rhs)
                 }
             }
         }

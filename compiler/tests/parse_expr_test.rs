@@ -54,6 +54,7 @@ fn test_debug_expr(ctx: &CompilationContext, expr: &pt::Expression) -> String {
             tc::Literal::Nil => "nil".to_owned(),
         },
         pt::Expression::Identifier(ident) => ctx.resolve_str_symbol(ident.identifier),
+        _ => unimplemented!(),
     }
 }
 
@@ -82,7 +83,9 @@ fn test_expression_simple_eval() {
     let expr = utils::parse_expression(&context, &&input_content);
 
     let mut translator = Translator::new(&context);
-    let expr = translator.translate_expression(expr);
+    let expr = translator
+        .translate_expression(expr)
+        .expect("Failed to translate expression from parse tree to ast");
 
     let stdout = std::io::stdout();
     let mut stdout = stdout.lock();

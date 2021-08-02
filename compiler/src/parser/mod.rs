@@ -63,11 +63,15 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
+    fn front_matches(&mut self, token: Token) -> Result<bool, ParseError> {
+        let front_st = self.lexer.peek_token()?;
+        Ok(front_st.token == token)
+    }
+
     pub fn parse_program(&mut self) -> Result<pt::Program, ParseError> {
         let mut declarations = Vec::new();
         loop {
-            let front_st = self.lexer.peek_token()?;
-            if front_st.token == Token::EndOfFile {
+            if self.front_matches(Token::EndOfFile)? {
                 break;
             }
 
@@ -170,13 +174,12 @@ impl<'c, 's> Parser<'c, 's> {
 
         let mut declarations = Vec::new();
         loop {
-            let front_st = self.lexer.peek_token()?;
-            if front_st.token != Token::RightBracket {
-                let stmt = self.parse_declaration()?;
-                declarations.push(stmt);
-            } else {
+            if self.front_matches(Token::RightBracket)? {
                 break;
             }
+
+            let stmt = self.parse_declaration()?;
+            declarations.push(stmt);
         }
 
         let right_bracket_span = self.expect(Token::RightBracket)?;
@@ -208,7 +211,23 @@ impl<'c, 's> Parser<'c, 's> {
     }
 
     pub fn parse_expression(&mut self) -> Result<pt::Expression, ParseError> {
-        self.parse_logic_or()
+        self.parse_assignment_expression()
+    }
+
+    fn parse_assignment_expression(&mut self) -> Result<pt::Expression, ParseError> {
+        let mut lhs = self.parse_logic_or()?;
+        if self.front_matches(Token::Equal)? {
+            let equal_span = self.expect(Token::Equal)?;
+
+            let rhs = self.parse_assignment_expression()?;
+
+            lhs = pt::Expression::Assignment(pt::AssignmentExpression {
+                equal_span,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+            });
+        }
+        Ok(lhs)
     }
 
     parse_expr_fn!(parse_logic_or, parse_logic_and,

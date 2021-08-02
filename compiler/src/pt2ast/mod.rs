@@ -64,7 +64,10 @@ impl<'c> Translator<'c> {
         }
 
         let (init_expression, equal_span) = if let Some(init) = var_decl.init {
-            (self.translate_expression(*init.expression), init.equal_span)
+            (
+                self.translate_expression(*init.expression)?,
+                init.equal_span,
+            )
         } else {
             let expr = ast::Expression::Literal(tc::LiteralExpression {
                 literal: tc::Literal::Nil,
@@ -122,7 +125,7 @@ impl<'c> Translator<'c> {
         &mut self,
         statement: pt::PrintStatement,
     ) -> Result<ast::Statement, SemanticError> {
-        let expr = self.translate_expression(*statement.expression);
+        let expr = self.translate_expression(*statement.expression)?;
         Ok(ast::Statement::Print {
             expression: Box::new(expr),
             print_keyword_span: statement.print_keyword_span,
@@ -134,11 +137,12 @@ impl<'c> Translator<'c> {
         &mut self,
         statement: pt::ExpressionStatement,
     ) -> Result<ast::Statement, SemanticError> {
-        let expr = statement
+        let expression = statement
             .expression
-            .map(|expr| Box::new(self.translate_expression(*expr)));
+            .map(|expr| self.translate_expression(*expr).map(Box::new))
+            .transpose()?;
         Ok(ast::Statement::Expression {
-            expression: expr,
+            expression,
             semicolon_span: statement.semicolon_span,
         })
     }
@@ -147,7 +151,7 @@ impl<'c> Translator<'c> {
         &mut self,
         statement: pt::IfStatement,
     ) -> Result<ast::Statement, SemanticError> {
-        let condition = self.translate_expression(*statement.condition);
+        let condition = self.translate_expression(*statement.condition)?;
         let true_body = self.translate_statement(*statement.body)?;
 
         let (false_body, else_keyword_span) = if let Some(else_part) = statement.else_statement {
@@ -173,8 +177,14 @@ impl<'c> Translator<'c> {
         })
     }
 
-    pub fn translate_expression(&mut self, expr: pt::Expression) -> ast::Expression {
+    pub fn translate_expression(
+        &mut self,
+        expr: pt::Expression,
+    ) -> Result<ast::Expression, SemanticError> {
         match expr {
+            pt::Expression::Assignment(assign_expr) => {
+                self.translate_assignment_expression(assign_expr)
+            }
             pt::Expression::Parenthesis(pt::ParenthesisExpression { sub, .. }) => {
                 self.translate_expression(*sub)
             }
@@ -183,17 +193,40 @@ impl<'c> Translator<'c> {
                 operator,
                 operator_span,
                 sub,
-            }) => ast::Expression::Unary(ast::UnaryExpression {
+            }) => Ok(ast::Expression::Unary(ast::UnaryExpression {
                 operator,
                 operator_span,
-                sub: Box::new(self.translate_expression(*sub)),
-            }),
-            pt::Expression::Literal(literal) => ast::Expression::Literal(literal),
-            pt::Expression::Identifier(id) => ast::Expression::Identifier(id),
+                sub: Box::new(self.translate_expression(*sub)?),
+            })),
+            pt::Expression::Literal(literal) => Ok(ast::Expression::Literal(literal)),
+            pt::Expression::Identifier(id) => Ok(ast::Expression::Identifier(id)),
         }
     }
 
-    fn translate_binary_expression(&mut self, expr: pt::BinaryExpression) -> ast::Expression {
+    fn translate_assignment_expression(
+        &mut self,
+        expr: pt::AssignmentExpression,
+    ) -> Result<ast::Expression, SemanticError> {
+        let lhs = self.translate_expression(*expr.lhs)?;
+        let rhs = self.translate_expression(*expr.rhs)?;
+
+        if let Some(assign) = lhs.into_assign() {
+            Ok(ast::Expression::AssignExpression(ast::AssignExpression {
+                equal_span: expr.equal_span,
+                lhs: Box::new(assign),
+                rhs: Box::new(rhs),
+            }))
+        } else {
+            Err(SemanticError::LhsNotAssignable {
+                lhs_span: expr.equal_span,
+            })
+        }
+    }
+
+    fn translate_binary_expression(
+        &mut self,
+        expr: pt::BinaryExpression,
+    ) -> Result<ast::Expression, SemanticError> {
         let pt::BinaryExpression {
             operator,
             operator_span,
@@ -206,8 +239,8 @@ impl<'c> Translator<'c> {
             Binary(ast::BinaryOperator),
         }
 
-        let lhs = Box::new(self.translate_expression(*lhs));
-        let rhs = Box::new(self.translate_expression(*rhs));
+        let lhs = Box::new(self.translate_expression(*lhs)?);
+        let rhs = Box::new(self.translate_expression(*rhs)?);
         let op = match operator {
             pt::BinaryOperator::LogicalAnd => {
                 LogicalOrBinary::Logical(ast::LazyLogicalOperator::LogicalAnd)
@@ -235,7 +268,7 @@ impl<'c> Translator<'c> {
             pt::BinaryOperator::Divide => LogicalOrBinary::Binary(ast::BinaryOperator::Divide),
         };
 
-        match op {
+        Ok(match op {
             LogicalOrBinary::Binary(op) => ast::Expression::Binary(ast::BinaryExpression {
                 operator: op,
                 operator_span,
@@ -250,6 +283,6 @@ impl<'c> Translator<'c> {
                     rhs,
                 })
             }
-        }
+        })
     }
 }

@@ -8,6 +8,9 @@ pub enum SemanticError {
         identifier: String,
         identifier_span: Span,
     },
+    LhsNotAssignable {
+        lhs_span: Span,
+    },
 }
 
 impl fmt::Display for SemanticError {
@@ -21,6 +24,13 @@ impl fmt::Display for SemanticError {
                 "[span: {:?}]: Identifier already defined `{}`",
                 identifier_span, identifier
             ),
+            SemanticError::LhsNotAssignable { lhs_span } => {
+                write!(
+                    f,
+                    "[span: {:?}]: Left-hand side is not assignable",
+                    lhs_span
+                )
+            }
         }
     }
 }
@@ -33,6 +43,7 @@ impl ErrorSpannable for SemanticError {
             SemanticError::IdentifierAlreadyDefined {
                 identifier_span, ..
             } => *identifier_span,
+            SemanticError::LhsNotAssignable { lhs_span } => *lhs_span,
         }
     }
 }
