@@ -1,10 +1,13 @@
-use std::io::{BufRead, BufReader};
+use std::{
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 use compiler::{
     ast, lexer::Lexer, parse_tree as pt, parser::Parser, pt2ast::Translator, CompilationContext,
 };
 
-pub fn extract_expect(path: &str) -> String {
+pub fn extract_expect<P: AsRef<Path>>(path: P) -> String {
     const EXPECT_PREFIX: &str = "// expect: ";
 
     let test_desc_file = std::fs::File::open(path).expect("Failed to open test description file");
@@ -25,7 +28,7 @@ pub fn extract_expect(path: &str) -> String {
     res
 }
 
-pub fn parse_expression(context: &CompilationContext, path: &str) -> pt::Expression {
+pub fn parse_expression<P: AsRef<Path>>(context: &CompilationContext, path: P) -> pt::Expression {
     let input_content = std::fs::read_to_string(path).expect("Failed to read input file");
 
     let lexer = Lexer::new(&context, &input_content);
@@ -36,7 +39,7 @@ pub fn parse_expression(context: &CompilationContext, path: &str) -> pt::Express
         .expect("Failed to parse expression")
 }
 
-pub fn parse_program(context: &CompilationContext, path: &str) -> ast::Program {
+pub fn parse_program<P: AsRef<Path>>(context: &CompilationContext, path: P) -> ast::Program {
     let input_content = std::fs::read_to_string(path).expect("Failed to read input file");
 
     let lexer = Lexer::new(&context, &input_content);
