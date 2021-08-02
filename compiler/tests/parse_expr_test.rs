@@ -60,7 +60,7 @@ fn test_debug_expr(ctx: &CompilationContext, expr: &pt::Expression) -> String {
 #[test]
 fn test_expression_parse_tree() {
     const INPUT_PATH: &str = "./../testsuite/expressions/parse.lox";
-    let expected = utils::extract_expect(INPUT_PATH);
+    let expected = extract_enum_value!(utils::extract_expect(INPUT_PATH), utils::ExpectInfo::Output(output) => output);
 
     let context = CompilationContext::default();
     let expr = utils::parse_expression(&context, INPUT_PATH);
@@ -70,7 +70,7 @@ fn test_expression_parse_tree() {
 #[test]
 fn test_expression_simple_eval() {
     const INPUT_PATH: &str = "./../testsuite/expressions/evaluate.lox";
-    let expected = utils::extract_expect(INPUT_PATH);
+    let expected = extract_enum_value!(utils::extract_expect(INPUT_PATH), utils::ExpectInfo::Output(output) => output);
 
     let context = CompilationContext::default();
     let expr = utils::parse_expression(&context, INPUT_PATH);
