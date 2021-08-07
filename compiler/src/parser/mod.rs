@@ -395,29 +395,10 @@ impl<'c, 's> Parser<'c, 's> {
         Token::Plus => pt::BinaryOperator::Add,
     );
 
-    fn parse_factor(&mut self) -> Result<pt::Expression, ParseError> {
-        let mut lhs = self.parse_unary()?;
-
-        loop {
-            let next_st = self.lexer.peek_token()?;
-            let operator = match next_st.token {
-                Token::Slash => pt::BinaryOperator::Divide,
-                Token::Star => pt::BinaryOperator::Multiply,
-                _ => break,
-            };
-
-            self.advance_lexer();
-            let rhs = self.parse_unary()?;
-            lhs = pt::Expression::Binary(pt::BinaryExpression {
-                operator,
-                operator_span: next_st.span,
-                lhs: Box::new(lhs),
-                rhs: Box::new(rhs),
-            });
-        }
-
-        Ok(lhs)
-    }
+    parse_expr_fn!(parse_factor, parse_unary,
+        Token::Slash => pt::BinaryOperator::Divide,
+        Token::Star => pt::BinaryOperator::Multiply,
+    );
 
     fn parse_unary(&mut self) -> Result<pt::Expression, ParseError> {
         let front_st = self.lexer.peek_token()?;
