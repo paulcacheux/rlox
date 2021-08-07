@@ -24,21 +24,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut parser = Parser::new(lexer.peekable());
 
-    let program = parser.parse_program().expect("Failed to parse program");
+    let program = parser.parse_program()?;
 
     let mut translator = Translator::new(&context);
-    let program = translator
-        .translate_program(program)
-        .expect("Failed to translate parse tree to AST");
+    let program = translator.translate_program(program)?;
 
     // println!("{:#?}", program);
 
     let stdout = std::io::stdout();
     let mut stdout = stdout.lock();
     let mut evaluator = Evaluator::new(&context, &mut stdout);
-    evaluator
-        .eval_program(&program)
-        .expect("Failed to eval program");
+    evaluator.eval_program(&program)?;
 
     Ok(())
 }
