@@ -421,8 +421,27 @@ impl<'c, 's> Parser<'c, 's> {
                     sub: Box::new(sub),
                 }))
             }
-            _ => self.parse_primary(),
+            _ => self.parse_call(),
         }
+    }
+
+    fn parse_call(&mut self) -> Result<pt::Expression, ParseError> {
+        let mut call = self.parse_primary()?;
+
+        if self.front_matches(Token::LeftParenthesis)? {
+            let left_parenthesis_span = self.expect(Token::LeftParenthesis)?;
+            let arguments = self.parse_comma_separated_in_parenthesis(Parser::parse_expression)?;
+            let right_parenthesis_span = self.expect(Token::RightParenthesis)?;
+
+            call = pt::Expression::Call(pt::CallExpression {
+                function: Box::new(call),
+                left_parenthesis_span,
+                arguments,
+                right_parenthesis_span,
+            })
+        }
+
+        Ok(call)
     }
 
     fn parse_primary(&mut self) -> Result<pt::Expression, ParseError> {

@@ -119,6 +119,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
             ast::Expression::LazyLogical(inner) => self.eval_lazyop_expression(inner),
             ast::Expression::Binary(inner) => self.eval_binop_expression(inner),
             ast::Expression::Unary(inner) => self.eval_unaryop_expression(inner),
+            ast::Expression::Call(_) => unimplemented!(),
             ast::Expression::Literal(literal) => match literal.literal {
                 tc::Literal::Number(value) => Ok(Value::Number(value)),
                 tc::Literal::String(sym) => Ok(Value::String(sym)),

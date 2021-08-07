@@ -60,6 +60,7 @@ pub enum Expression {
     AssignExpression(AssignExpression),
     LazyLogical(LazyLogicalExpression),
     Binary(BinaryExpression),
+    Call(CallExpression),
     Unary(UnaryExpression),
     Literal(tc::LiteralExpression),
     Identifier(tc::IdentifierExpression),
@@ -128,4 +129,12 @@ pub struct UnaryExpression {
     pub operator: tc::UnaryOperator,
     pub operator_span: Span,
     pub sub: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct CallExpression {
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
+    pub left_parenthesis_span: Span,
+    pub right_parenthesis_span: Span,
 }

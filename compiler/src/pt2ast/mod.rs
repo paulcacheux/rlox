@@ -307,6 +307,16 @@ impl<'c> Translator<'c> {
             })),
             pt::Expression::Literal(literal) => Ok(ast::Expression::Literal(literal)),
             pt::Expression::Identifier(id) => Ok(ast::Expression::Identifier(id)),
+            pt::Expression::Call(call) => Ok(ast::Expression::Call(ast::CallExpression {
+                function: Box::new(self.translate_expression(*call.function)?),
+                arguments: call
+                    .arguments
+                    .into_iter()
+                    .map(|arg| self.translate_expression(arg))
+                    .collect::<Result<Vec<_>, _>>()?,
+                left_parenthesis_span: call.left_parenthesis_span,
+                right_parenthesis_span: call.right_parenthesis_span,
+            })),
         }
     }
 

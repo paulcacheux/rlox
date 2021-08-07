@@ -7,6 +7,7 @@ pub enum Expression {
     Parenthesis(ParenthesisExpression),
     Binary(BinaryExpression),
     Unary(UnaryExpression),
+    Call(CallExpression),
     Literal(tc::LiteralExpression),
     Identifier(tc::IdentifierExpression),
 }
@@ -54,4 +55,12 @@ pub struct UnaryExpression {
     pub operator: tc::UnaryOperator,
     pub operator_span: Span,
     pub sub: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct CallExpression {
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
+    pub left_parenthesis_span: Span,
+    pub right_parenthesis_span: Span,
 }
