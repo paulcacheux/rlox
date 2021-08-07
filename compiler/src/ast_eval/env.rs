@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 use string_interner::DefaultSymbol;
@@ -33,14 +33,16 @@ impl Environment {
         values.insert(name, value);
     }
 
-    pub fn set_variable(self: &Arc<Self>, name: DefaultSymbol, value: Value) -> bool {
+    pub fn set_variable(self: &Arc<Self>, name: &DefaultSymbol, value: Value) -> bool {
         let mut values = self.values.lock().expect("Failed to lock env");
-        match values.entry(name) {
-            Entry::Occupied(mut occ) => {
-                occ.insert(value);
-                true
-            }
-            Entry::Vacant(_) => false,
+
+        if let Some(entry) = values.get_mut(&name) {
+            *entry = value;
+            true
+        } else if let Some(parent) = &self.parent {
+            parent.set_variable(name, value)
+        } else {
+            false
         }
     }
 

@@ -139,7 +139,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
         match &*expr.lhs {
             ast::AssignExpressionLhs::Identifier(ident) => {
-                if !self.current_env.set_variable(ident.identifier, rhs) {
+                if !self.current_env.set_variable(&ident.identifier, rhs) {
                     Err(EvalError {
                         msg: format!(
                             "Variable `{}` is not defined",
