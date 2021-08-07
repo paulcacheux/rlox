@@ -51,6 +51,7 @@ impl<'c, 's> Parser<'c, 's> {
         let _ = self.lexer.next_token();
     }
 
+    #[inline(always)]
     fn expect(&mut self, expected: Token) -> Result<Span, ParseError> {
         let next_st = self.lexer.next_token()?;
         if next_st.token == expected {
@@ -63,6 +64,7 @@ impl<'c, 's> Parser<'c, 's> {
         }
     }
 
+    #[inline(always)]
     fn front_matches(&mut self, token: Token) -> Result<bool, ParseError> {
         let front_st = self.lexer.peek_token()?;
         Ok(front_st.token == token)
