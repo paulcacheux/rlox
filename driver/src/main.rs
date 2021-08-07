@@ -1,10 +1,23 @@
+use clap::Clap;
 use compiler::{
     ast_eval::Evaluator, lexer::Lexer, parser::Parser, pt2ast::Translator, CompilationContext,
 };
 
+/// rlox, clox interpreter in Rust
+#[derive(Clap)]
+#[clap(
+    name = "rlox_driver",
+    version = "1.0",
+    author = "Paul C. <paulcacheux@gmail.com>"
+)]
+struct Options {
+    /// Source code input path
+    input_path: String,
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let input_path = std::env::args().nth(1).expect("Failed to get input path");
-    let content = std::fs::read_to_string(&input_path)?;
+    let opts = Options::parse();
+    let content = std::fs::read_to_string(&opts.input_path)?;
 
     let context = CompilationContext::default();
     let lexer = Lexer::new(&context, &content);
