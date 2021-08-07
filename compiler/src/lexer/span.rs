@@ -40,4 +40,11 @@ impl Span {
     pub fn is_invalid(&self) -> bool {
         *self == Self::INVALID
     }
+
+    pub fn merge(a: Span, b: Span) -> Span {
+        Span {
+            begin: a.begin,
+            end: b.end,
+        }
+    }
 }

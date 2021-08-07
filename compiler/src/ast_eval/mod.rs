@@ -4,14 +4,17 @@ use crate::{ast, tree_common as tc, CompilationContext};
 
 mod env;
 mod error;
+mod function;
 mod value;
 pub use env::Environment;
 pub use error::EvalError;
+use function::FunctionEvaluator;
 pub use value::Value;
 
 #[derive(Debug)]
 pub struct Evaluator<'c, W: Write> {
     context: &'c CompilationContext,
+    functions: Vec<FunctionEvaluator>,
     current_env: Arc<Environment>,
     stdout: W,
 }
@@ -22,6 +25,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
         Evaluator {
             context,
+            functions: Vec::new(),
             current_env,
             stdout,
         }
@@ -39,12 +43,29 @@ impl<'c, W: Write> Evaluator<'c, W> {
             .expect("Failed to switch to parent env");
     }
 
+    fn create_function_ref(&mut self, evaluator: FunctionEvaluator) -> Value {
+        let index = self.functions.len();
+        self.functions.push(evaluator);
+        Value::FunctionRef(index)
+    }
+
+    fn eval_with_env<T, F>(&mut self, env: Arc<Environment>, eval: F) -> Result<T, EvalError>
+    where
+        F: Fn(&mut Self) -> Result<T, EvalError>,
+    {
+        let save_env = std::mem::replace(&mut self.current_env, env);
+        let res = eval(self)?;
+        self.current_env = save_env;
+        Ok(res)
+    }
+
     pub fn value_to_str(&self, value: Value) -> String {
         match value {
             Value::Nil => "nil".into(),
             Value::Number(value) => value.to_string(),
             Value::Bool(value) => value.to_string(),
             Value::String(sym) => self.context.resolve_str_symbol(sym),
+            Value::FunctionRef(index) => format!("<function [{}]>", index),
         }
     }
 
@@ -68,7 +89,21 @@ impl<'c, W: Write> Evaluator<'c, W> {
                     .define_variable(identifier.identifier, init_value);
                 Ok(())
             }
-            ast::Statement::FunctionDeclaration { .. } => unimplemented!(),
+            ast::Statement::FunctionDeclaration {
+                function_name,
+                parameters,
+                body,
+                ..
+            } => {
+                let fun_eval = FunctionEvaluator {
+                    parameters: parameters.iter().map(|ident| ident.identifier).collect(),
+                    body: body.clone(),
+                };
+                let fun_ref = self.create_function_ref(fun_eval);
+                self.current_env
+                    .define_variable(function_name.identifier, fun_ref);
+                Ok(())
+            }
             ast::Statement::Block { statements, .. } => {
                 self.begin_env();
                 for stmt in statements {
@@ -119,7 +154,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
             ast::Expression::LazyLogical(inner) => self.eval_lazyop_expression(inner),
             ast::Expression::Binary(inner) => self.eval_binop_expression(inner),
             ast::Expression::Unary(inner) => self.eval_unaryop_expression(inner),
-            ast::Expression::Call(_) => unimplemented!(),
+            ast::Expression::Call(inner) => self.eval_call_expression(inner),
             ast::Expression::Literal(literal) => match literal.literal {
                 tc::Literal::Number(value) => Ok(Value::Number(value)),
                 tc::Literal::String(sym) => Ok(Value::String(sym)),
@@ -280,6 +315,48 @@ impl<'c, W: Write> Evaluator<'c, W> {
             (tc::UnaryOperator::LogicalNot, _) => Err(EvalError {
                 msg: "Operand must be a boolean".into(),
                 span: expr.operator_span,
+            }),
+        }
+    }
+
+    fn eval_call_expression(&mut self, call: &ast::CallExpression) -> Result<Value, EvalError> {
+        let function = self.eval_expression(&call.function)?;
+
+        match function {
+            Value::FunctionRef(index) => {
+                let args = call
+                    .arguments
+                    .iter()
+                    .map(|arg| self.eval_expression(arg))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                let function = &self.functions[index];
+                if function.parameter_count() != args.len() {
+                    return Err(EvalError {
+                        msg: format!(
+                            "Mismatch in argument count, expected {} and got {} arguments",
+                            function.parameter_count(),
+                            args.len()
+                        )
+                        .into(),
+                        span: call.span(),
+                    });
+                }
+
+                let body = function.body.clone();
+
+                let new_env = Environment::new();
+                for (param, arg) in function.parameters.iter().zip(args.iter()) {
+                    new_env.define_variable(*param, *arg);
+                }
+
+                self.eval_with_env(new_env, |evaluator| evaluator.eval_statement(&body))?;
+
+                Ok(Value::Nil)
+            }
+            _ => Err(EvalError {
+                msg: "Called expression must be a function".into(),
+                span: call.function.span(),
             }),
         }
     }

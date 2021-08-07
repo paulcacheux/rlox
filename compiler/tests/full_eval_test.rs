@@ -82,3 +82,8 @@ fn test_expression_full_eval_nil(input_path: &str) {
 fn test_expression_full_eval_string(input_path: &str) {
     inner_eval_test(input_path)
 }
+
+#[test_resources("testsuite/function/*.lox")]
+fn test_expression_full_eval_function(input_path: &str) {
+    inner_eval_test(input_path)
+}

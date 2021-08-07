@@ -6,6 +6,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     String(DefaultSymbol),
+    FunctionRef(usize),
 }
 
 impl Value {

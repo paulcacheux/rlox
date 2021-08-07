@@ -6,7 +6,7 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     VarDeclaration {
         var_keyword_span: Span,
@@ -55,7 +55,7 @@ pub enum Statement {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     AssignExpression(AssignExpression),
     LazyLogical(LazyLogicalExpression),
@@ -74,21 +74,47 @@ impl Expression {
             None
         }
     }
+
+    pub fn span(&self) -> Span {
+        match self {
+            Expression::AssignExpression(expr) => expr.span(),
+            Expression::LazyLogical(expr) => expr.span(),
+            Expression::Binary(expr) => expr.span(),
+            Expression::Call(expr) => expr.span(),
+            Expression::Unary(expr) => expr.span(),
+            Expression::Literal(expr) => expr.span(),
+            Expression::Identifier(expr) => expr.span(),
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AssignExpressionLhs {
     Identifier(tc::IdentifierExpression),
 }
 
-#[derive(Debug)]
+impl AssignExpressionLhs {
+    pub fn span(&self) -> Span {
+        match self {
+            AssignExpressionLhs::Identifier(ident) => ident.span,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct AssignExpression {
     pub equal_span: Span,
     pub lhs: Box<AssignExpressionLhs>,
     pub rhs: Box<Expression>,
 }
 
-#[derive(Debug)]
+impl AssignExpression {
+    pub fn span(&self) -> Span {
+        Span::merge(self.lhs.span(), self.rhs.span())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct LazyLogicalExpression {
     pub operator: LazyLogicalOperator,
     pub operator_span: Span,
@@ -96,18 +122,30 @@ pub struct LazyLogicalExpression {
     pub rhs: Box<Expression>,
 }
 
-#[derive(Debug)]
+impl LazyLogicalExpression {
+    pub fn span(&self) -> Span {
+        Span::merge(self.lhs.span(), self.rhs.span())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum LazyLogicalOperator {
     LogicalAnd,
     LogicalOr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryExpression {
     pub operator: BinaryOperator,
     pub operator_span: Span,
     pub lhs: Box<Expression>,
     pub rhs: Box<Expression>,
+}
+
+impl BinaryExpression {
+    pub fn span(&self) -> Span {
+        Span::merge(self.lhs.span(), self.rhs.span())
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -124,17 +162,29 @@ pub enum BinaryOperator {
     Divide,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnaryExpression {
     pub operator: tc::UnaryOperator,
     pub operator_span: Span,
     pub sub: Box<Expression>,
 }
 
-#[derive(Debug)]
+impl UnaryExpression {
+    pub fn span(&self) -> Span {
+        Span::merge(self.operator_span, self.sub.span())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct CallExpression {
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
     pub left_parenthesis_span: Span,
     pub right_parenthesis_span: Span,
+}
+
+impl CallExpression {
+    pub fn span(&self) -> Span {
+        Span::merge(self.function.span(), self.right_parenthesis_span)
+    }
 }
