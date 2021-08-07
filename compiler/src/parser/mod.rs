@@ -1,7 +1,7 @@
 use std::str::CharIndices;
 
 use crate::{
-    lexer::{CommentRemover, PeekableLexer, Span, Token},
+    lexer::{CommentRemover, PeekableLexer, Span, SpannedToken, Token},
     parse_tree as pt, tree_common as tc,
 };
 pub use error::ParseError;
@@ -128,6 +128,77 @@ impl<'c, 's> Parser<'c, 's> {
             init,
             semicolon_span,
         })
+    }
+
+    pub fn parse_function_declaration(&mut self) -> Result<pt::FunctionDeclaration, ParseError> {
+        let fun_keyword_span = self.expect(Token::FunKeyword)?;
+        let function_name = self.parse_function_name()?;
+        let left_parenthesis_span = self.expect(Token::LeftParenthesis)?;
+        let parameters =
+            self.parse_comma_separated_in_parenthesis(|parser| parser.parse_function_parameter())?;
+        let right_parenthesis_span = self.expect(Token::LeftParenthesis)?;
+        let body = self.parse_block_statement()?;
+
+        Ok(pt::FunctionDeclaration {
+            fun_keyword_span,
+            function_name,
+            parameters,
+            left_parenthesis_span,
+            right_parenthesis_span,
+            body: Box::new(body),
+        })
+    }
+
+    fn parse_function_name(&mut self) -> Result<tc::IdentifierExpression, ParseError> {
+        let front_st = self.lexer.next_token()?;
+        self.parse_identifier_expression(front_st)
+            .map_err(|got| ParseError::UnexpectedSyntax {
+                msg: "Expected an identifier",
+                got,
+            })
+    }
+
+    fn parse_function_parameter(&mut self) -> Result<tc::IdentifierExpression, ParseError> {
+        let front_st = self.lexer.next_token()?;
+        self.parse_identifier_expression(front_st)
+            .map_err(|got| ParseError::UnexpectedSyntax {
+                msg: "Expected an identifier, a `,` or a `)`",
+                got,
+            })
+    }
+
+    #[inline(always)]
+    fn parse_identifier_expression(
+        &mut self,
+        front_st: SpannedToken,
+    ) -> Result<tc::IdentifierExpression, SpannedToken> {
+        if let Token::Identifier(ident) = front_st.token {
+            Ok(tc::IdentifierExpression {
+                identifier: ident,
+                span: front_st.span,
+            })
+        } else {
+            Err(front_st)
+        }
+    }
+
+    fn parse_comma_separated_in_parenthesis<T, F>(&mut self, inner: F) -> Result<Vec<T>, ParseError>
+    where
+        F: Fn(&mut Self) -> Result<T, ParseError>,
+    {
+        let mut res = Vec::new();
+        if self.front_matches(Token::RightParenthesis)? {
+            return Ok(res);
+        }
+
+        res.push(inner(self)?);
+        while self.front_matches(Token::Comma)? {
+            self.advance_lexer();
+
+            res.push(inner(self)?);
+        }
+
+        Ok(res)
     }
 
     pub fn parse_statement(&mut self) -> Result<pt::Statement, ParseError> {
