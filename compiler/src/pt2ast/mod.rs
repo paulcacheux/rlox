@@ -9,6 +9,7 @@ mod scope;
 use scope::Scopes;
 
 use self::error::SemanticError;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Translator<'c> {
@@ -44,6 +45,7 @@ impl<'c> Translator<'c> {
         match declaration {
             pt::Declaration::Var(decl) => self.translate_var_declaration(decl),
             pt::Declaration::Statement(stmt) => self.translate_statement(stmt),
+            pt::Declaration::Fun(fun) => self.translate_function_declaration(fun),
         }
     }
 
@@ -82,6 +84,34 @@ impl<'c> Translator<'c> {
             init_expression: Box::new(init_expression),
             equal_span,
             semicolon_span: var_decl.semicolon_span,
+        })
+    }
+
+    pub fn translate_function_declaration(
+        &mut self,
+        decl: pt::FunctionDeclaration,
+    ) -> Result<ast::Statement, SemanticError> {
+        let mut param_set = HashSet::new();
+        for param in &decl.parameters {
+            if param_set.contains(&param.identifier) {
+                return Err(SemanticError::IdentifierAlreadyDefined {
+                    identifier: self.context.resolve_str_symbol(param.identifier),
+                    identifier_span: param.span,
+                });
+            }
+
+            param_set.insert(param.identifier);
+        }
+
+        let body = self.translate_block_statement(*decl.body)?;
+
+        Ok(ast::Statement::FunctionDeclaration {
+            fun_keyword_span: decl.fun_keyword_span,
+            function_name: decl.function_name,
+            parameters: decl.parameters,
+            left_parenthesis_span: decl.left_parenthesis_span,
+            right_parenthesis_span: decl.right_parenthesis_span,
+            body: Box::new(body),
         })
     }
 

@@ -68,6 +68,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                     .define_variable(identifier.identifier, init_value);
                 Ok(())
             }
+            ast::Statement::FunctionDeclaration { .. } => unimplemented!(),
             ast::Statement::Block { statements, .. } => {
                 self.begin_env();
                 for stmt in statements {

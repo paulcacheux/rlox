@@ -15,6 +15,14 @@ pub enum Statement {
         equal_span: Span,
         semicolon_span: Span,
     },
+    FunctionDeclaration {
+        fun_keyword_span: Span,
+        function_name: tc::IdentifierExpression,
+        parameters: Vec<tc::IdentifierExpression>,
+        left_parenthesis_span: Span,
+        right_parenthesis_span: Span,
+        body: Box<Statement>,
+    },
     Block {
         statements: Vec<Statement>,
         left_bracket_span: Span,
