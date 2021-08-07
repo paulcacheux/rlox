@@ -66,6 +66,13 @@ fn test_expression_full_eval_while(input_path: &str) {
     inner_eval_test(input_path)
 }
 
+#[test_resources("testsuite/for/*.lox")]
+fn test_expression_full_eval_for(input_path: &str) {
+    if input_path.contains("statement_") || input_path.contains("var_in_body") {
+        inner_eval_test(input_path)
+    }
+}
+
 #[test_resources("testsuite/nil/*.lox")]
 fn test_expression_full_eval_nil(input_path: &str) {
     inner_eval_test(input_path)
