@@ -36,7 +36,7 @@ impl Environment {
     pub fn set_variable(self: &Arc<Self>, name: &DefaultSymbol, value: Value) -> bool {
         let mut values = self.values.lock().expect("Failed to lock env");
 
-        if let Some(entry) = values.get_mut(&name) {
+        if let Some(entry) = values.get_mut(name) {
             *entry = value;
             true
         } else if let Some(parent) = &self.parent {
