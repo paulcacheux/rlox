@@ -94,6 +94,7 @@ impl<'c> Translator<'c> {
             pt::Statement::Expression(es) => self.translate_expression_statement(es),
             pt::Statement::If(is) => self.translate_if_statement(is),
             pt::Statement::While(ws) => self.translate_while_statement(ws),
+            pt::Statement::For(fs) => self.translate_for_statement(fs),
             pt::Statement::Print(ps) => self.translate_print_statement(ps),
         }
     }
@@ -192,6 +193,65 @@ impl<'c> Translator<'c> {
             right_paren_span: statement.right_paren_span,
             body: Box::new(body),
         })
+    }
+
+    pub fn translate_for_statement(
+        &mut self,
+        statement: pt::ForStatement,
+    ) -> Result<ast::Statement, SemanticError> {
+        let init = match *statement.init {
+            pt::VarDeclOrExpressionStatement::Var(var_decl) => {
+                self.translate_var_declaration(var_decl)?
+            }
+            pt::VarDeclOrExpressionStatement::Expr(expr_stmt) => {
+                self.translate_expression_statement(expr_stmt)?
+            }
+        };
+
+        let condition = if let Some(expr) = statement.condition.expression {
+            self.translate_expression(*expr)?
+        } else {
+            ast::Expression::Literal(tc::LiteralExpression {
+                literal: tc::Literal::Bool(true),
+                span: statement.condition.semicolon_span,
+            })
+        };
+
+        let body = self.translate_statement(*statement.body)?;
+
+        let res_loop_body = if let Some(step) = statement.step {
+            let step = self.translate_expression(*step)?;
+
+            ast::Statement::Block {
+                statements: vec![
+                    body,
+                    ast::Statement::Expression {
+                        expression: Some(step.into()),
+                        semicolon_span: Span::INVALID,
+                    },
+                ],
+                left_bracket_span: Span::INVALID,
+                right_bracket_span: Span::INVALID,
+            }
+        } else {
+            body
+        };
+
+        let while_loop = ast::Statement::While {
+            condition: condition.into(),
+            while_keyword_span: statement.for_keyword_span,
+            left_paren_span: statement.left_paren_span,
+            right_paren_span: statement.right_paren_span,
+            body: res_loop_body.into(),
+        };
+
+        let res = ast::Statement::Block {
+            statements: vec![init, while_loop],
+            left_bracket_span: Span::INVALID,
+            right_bracket_span: Span::INVALID,
+        };
+
+        Ok(res)
     }
 
     pub fn translate_expression(
