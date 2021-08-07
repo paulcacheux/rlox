@@ -29,6 +29,13 @@ pub enum Statement {
         else_keyword_span: Span,
         false_body: Box<Statement>,
     },
+    While {
+        condition: Box<Expression>,
+        while_keyword_span: Span,
+        left_paren_span: Span,
+        right_paren_span: Span,
+        body: Box<Statement>,
+    },
     Print {
         expression: Box<Expression>,
         print_keyword_span: Span,

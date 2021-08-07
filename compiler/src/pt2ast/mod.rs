@@ -93,6 +93,7 @@ impl<'c> Translator<'c> {
             pt::Statement::Block(bs) => self.translate_block_statement(bs),
             pt::Statement::Expression(es) => self.translate_expression_statement(es),
             pt::Statement::If(is) => self.translate_if_statement(is),
+            pt::Statement::While(ws) => self.translate_while_statement(ws),
             pt::Statement::Print(ps) => self.translate_print_statement(ps),
         }
     }
@@ -174,6 +175,22 @@ impl<'c> Translator<'c> {
             true_body: Box::new(true_body),
             else_keyword_span,
             false_body: Box::new(false_body),
+        })
+    }
+
+    pub fn translate_while_statement(
+        &mut self,
+        statement: pt::WhileStatement,
+    ) -> Result<ast::Statement, SemanticError> {
+        let condition = self.translate_expression(*statement.condition)?;
+        let body = self.translate_statement(*statement.body)?;
+
+        Ok(ast::Statement::While {
+            condition: Box::new(condition),
+            while_keyword_span: statement.while_keyword_span,
+            left_paren_span: statement.left_paren_span,
+            right_paren_span: statement.right_paren_span,
+            body: Box::new(body),
         })
     }
 

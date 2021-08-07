@@ -133,6 +133,7 @@ impl<'c, 's> Parser<'c, 's> {
 
         let stmt = match front_st.token {
             Token::IfKeyword => pt::Statement::If(self.parse_if_statement()?),
+            Token::WhileKeyword => pt::Statement::While(self.parse_while_statement()?),
             Token::PrintKeyword => pt::Statement::Print(self.parse_print_statement()?),
             Token::LeftBracket => pt::Statement::Block(self.parse_block_statement()?),
             _ => pt::Statement::Expression(self.parse_expression_statement()?),
@@ -166,6 +167,22 @@ impl<'c, 's> Parser<'c, 's> {
             right_paren_span,
             body: Box::new(body),
             else_statement,
+        })
+    }
+
+    pub fn parse_while_statement(&mut self) -> Result<pt::WhileStatement, ParseError> {
+        let while_keyword_span = self.expect(Token::WhileKeyword)?;
+        let left_paren_span = self.expect(Token::LeftParenthesis)?;
+        let condition = self.parse_expression()?;
+        let right_paren_span = self.expect(Token::RightParenthesis)?;
+        let body = self.parse_statement()?;
+
+        Ok(pt::WhileStatement {
+            condition: Box::new(condition),
+            while_keyword_span,
+            left_paren_span,
+            right_paren_span,
+            body: Box::new(body),
         })
     }
 

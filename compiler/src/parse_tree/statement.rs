@@ -5,6 +5,7 @@ pub enum Statement {
     Block(BlockStatement),
     Expression(ExpressionStatement),
     If(IfStatement),
+    While(WhileStatement),
     Print(PrintStatement),
 }
 
@@ -34,6 +35,15 @@ pub struct IfStatement {
 #[derive(Debug)]
 pub struct ElseStatement {
     pub else_keyword_span: Span,
+    pub body: Box<Statement>,
+}
+
+#[derive(Debug)]
+pub struct WhileStatement {
+    pub condition: Box<pt::Expression>,
+    pub while_keyword_span: Span,
+    pub left_paren_span: Span,
+    pub right_paren_span: Span,
     pub body: Box<Statement>,
 }
 

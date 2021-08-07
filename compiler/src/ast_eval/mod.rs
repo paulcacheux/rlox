@@ -82,11 +82,18 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 false_body,
                 ..
             } => {
-                let condition_value = self.eval_expression(condition)?;
-                if condition_value.to_bool() {
+                if self.eval_expression(condition)?.to_bool() {
                     self.eval_statement(true_body)?;
                 } else {
                     self.eval_statement(false_body)?;
+                }
+                Ok(())
+            }
+            ast::Statement::While {
+                condition, body, ..
+            } => {
+                while self.eval_expression(condition)?.to_bool() {
+                    self.eval_statement(body)?;
                 }
                 Ok(())
             }
