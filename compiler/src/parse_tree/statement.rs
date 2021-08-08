@@ -10,6 +10,7 @@ pub enum Statement {
     While(WhileStatement),
     For(ForStatement),
     Print(PrintStatement),
+    Return(ReturnStatement),
 }
 
 #[derive(Debug)]
@@ -71,5 +72,12 @@ pub enum VarDeclOrExpressionStatement {
 pub struct PrintStatement {
     pub expression: Box<pt::Expression>,
     pub print_keyword_span: Span,
+    pub semicolon_span: Span,
+}
+
+#[derive(Debug)]
+pub struct ReturnStatement {
+    pub expression: Option<Box<pt::Expression>>,
+    pub return_keyword_span: Span,
     pub semicolon_span: Span,
 }

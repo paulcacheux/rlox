@@ -126,6 +126,7 @@ impl<'c> Translator<'c> {
             pt::Statement::While(ws) => self.translate_while_statement(ws),
             pt::Statement::For(fs) => self.translate_for_statement(fs),
             pt::Statement::Print(ps) => self.translate_print_statement(ps),
+            pt::Statement::Return(rs) => self.translate_return_statement(rs),
         }
     }
 
@@ -161,6 +162,22 @@ impl<'c> Translator<'c> {
         Ok(ast::Statement::Print {
             expression: Box::new(expr),
             print_keyword_span: statement.print_keyword_span,
+            semicolon_span: statement.semicolon_span,
+        })
+    }
+
+    pub fn translate_return_statement(
+        &mut self,
+        statement: pt::ReturnStatement,
+    ) -> Result<ast::Statement, SemanticError> {
+        let expr = statement
+            .expression
+            .map(|expr| self.translate_expression(*expr))
+            .transpose()?;
+
+        Ok(ast::Statement::Return {
+            expression: expr.map(Box::new),
+            return_keyword_span: statement.return_keyword_span,
             semicolon_span: statement.semicolon_span,
         })
     }

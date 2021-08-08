@@ -49,6 +49,11 @@ pub enum Statement {
         print_keyword_span: Span,
         semicolon_span: Span,
     },
+    Return {
+        expression: Option<Box<Expression>>,
+        return_keyword_span: Span,
+        semicolon_span: Span,
+    },
     Expression {
         expression: Option<Box<Expression>>,
         semicolon_span: Span,

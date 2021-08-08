@@ -139,6 +139,14 @@ impl<'c, W: Write> Evaluator<'c, W> {
                     .expect("Failed to write to stdout");
                 Ok(())
             }
+            ast::Statement::Return { expression, .. } => {
+                let expr = expression
+                    .as_ref()
+                    .map(|expr| self.eval_expression(&expr))
+                    .transpose()?
+                    .unwrap_or(Value::Nil);
+                Ok(())
+            }
             ast::Statement::Expression { expression, .. } => {
                 if let Some(expr) = expression {
                     self.eval_expression(expr)?;
