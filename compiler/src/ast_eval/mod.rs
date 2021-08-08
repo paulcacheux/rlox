@@ -1,7 +1,8 @@
-use std::io::Write;
+use std::{io::Write, time::Instant};
 
-use crate::{ast, tree_common as tc, CompilationContext};
+use crate::{ast, lexer::Span, tree_common as tc, CompilationContext};
 
+mod builtin;
 mod env;
 mod error;
 mod function;
@@ -15,6 +16,7 @@ use self::env::Environment;
 
 #[derive(Debug)]
 pub struct Evaluator<'c, W: Write> {
+    start_eval_time: Instant,
     context: &'c CompilationContext,
     functions: Vec<FunctionEvaluator>,
     env: Environment,
@@ -34,9 +36,10 @@ macro_rules! flow {
 impl<'c, W: Write> Evaluator<'c, W> {
     pub fn new(context: &'c CompilationContext, stdout: W) -> Self {
         Evaluator {
+            start_eval_time: Instant::now(),
             context,
             functions: Vec::new(),
-            env: Environment::new(),
+            env: Environment::new(context),
             stdout,
         }
     }
@@ -70,7 +73,12 @@ impl<'c, W: Write> Evaluator<'c, W> {
             Value::Number(value) => value.to_string(),
             Value::Bool(value) => value.to_string(),
             Value::String(sym) => self.context.resolve_str_symbol(sym),
-            Value::FunctionRef(index) => format!("<fn {}>", index),
+            Value::FunctionRef(index) => {
+                let name = self.functions[index].name;
+                let name = self.context.resolve_str_symbol(name);
+                format!("<fn {}>", name)
+            }
+            Value::BuiltinFunction(_) => "<native fn>".into(),
         }
     }
 
@@ -106,6 +114,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 self.env.define_variable(function_name.identifier, fun_ref);
 
                 let fun_eval = FunctionEvaluator {
+                    name: function_name.identifier,
                     parent_env: self.env.clone_for_function(),
                     parameters: parameters.iter().map(|ident| ident.identifier).collect(),
                     body: body.clone(),
@@ -338,27 +347,20 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
     fn eval_call_expression(&mut self, call: &ast::CallExpression) -> Result<Value, EvalError> {
         let function = self.eval_expression(&call.function)?;
+        let args = call
+            .arguments
+            .iter()
+            .map(|arg| self.eval_expression(arg))
+            .collect::<Result<Vec<_>, _>>()?;
 
         match function {
+            Value::BuiltinFunction(builtin_func) => {
+                check_arity(builtin_func.arity(), args.len(), call.span())?;
+                builtin_func.eval(self, &args)
+            }
             Value::FunctionRef(index) => {
-                let args = call
-                    .arguments
-                    .iter()
-                    .map(|arg| self.eval_expression(arg))
-                    .collect::<Result<Vec<_>, _>>()?;
-
                 let function = &self.functions[index];
-                if function.parameter_count() != args.len() {
-                    return Err(EvalError {
-                        msg: format!(
-                            "Mismatch in argument count, expected {} and got {} arguments",
-                            function.parameter_count(),
-                            args.len()
-                        )
-                        .into(),
-                        span: call.span(),
-                    });
-                }
+                check_arity(function.parameter_count(), args.len(), call.span())?;
 
                 let body = function.body.clone();
 
@@ -389,4 +391,19 @@ impl<'c, W: Write> Evaluator<'c, W> {
 pub enum StatementControlFlow {
     Continue,
     Return(Value),
+}
+
+fn check_arity(expected: usize, got: usize, span: Span) -> Result<(), EvalError> {
+    if expected != got {
+        Err(EvalError {
+            msg: format!(
+                "Mismatch in argument count, expected {} and got {} arguments",
+                expected, got
+            )
+            .into(),
+            span,
+        })
+    } else {
+        Ok(())
+    }
 }

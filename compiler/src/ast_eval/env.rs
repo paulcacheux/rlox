@@ -1,10 +1,10 @@
+use super::{builtin::BuiltinFunction, Value};
+use crate::CompilationContext;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
 use string_interner::DefaultSymbol;
-
-use super::Value;
 
 #[derive(Debug)]
 pub struct Environment {
@@ -13,9 +13,9 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn new() -> Self {
+    pub fn new(context: &CompilationContext) -> Self {
         Environment {
-            globals: Default::default(),
+            globals: Arc::new(Globals::new(context)),
             top_scope: None,
         }
     }
@@ -68,12 +68,24 @@ impl Environment {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Globals {
     values: Mutex<HashMap<DefaultSymbol, Value>>,
 }
 
 impl Globals {
+    fn new(context: &CompilationContext) -> Self {
+        let mut values = HashMap::new();
+        values.insert(
+            context.intern_string("clock".into()),
+            Value::BuiltinFunction(BuiltinFunction::Clock),
+        );
+
+        Globals {
+            values: Mutex::new(values),
+        }
+    }
+
     fn define_variable(&self, name: DefaultSymbol, value: Value) {
         let mut values = self.values.lock().expect("Failed to lock env");
         values.insert(name, value);

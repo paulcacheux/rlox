@@ -1,5 +1,7 @@
 use string_interner::DefaultSymbol;
 
+use super::builtin::BuiltinFunction;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Value {
     Nil,
@@ -7,6 +9,7 @@ pub enum Value {
     Bool(bool),
     String(DefaultSymbol),
     FunctionRef(usize),
+    BuiltinFunction(BuiltinFunction),
 }
 
 impl Value {
