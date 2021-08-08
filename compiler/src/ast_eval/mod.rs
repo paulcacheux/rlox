@@ -229,24 +229,24 @@ impl<'c, W: Write> Evaluator<'c, W> {
         &mut self,
         expr: &ast::LazyLogicalExpression,
     ) -> Result<Value, EvalError> {
-        let lhs_value = self.eval_expression(&expr.lhs)?.to_bool();
+        let lhs_value = self.eval_expression(&expr.lhs)?;
         let res = match expr.operator {
             ast::LazyLogicalOperator::LogicalAnd => {
-                if lhs_value {
-                    self.eval_expression(&expr.rhs)?.to_bool()
+                if lhs_value.to_bool() {
+                    self.eval_expression(&expr.rhs)?
                 } else {
-                    false
+                    lhs_value
                 }
             }
             ast::LazyLogicalOperator::LogicalOr => {
-                if lhs_value {
-                    true
+                if lhs_value.to_bool() {
+                    lhs_value
                 } else {
-                    self.eval_expression(&expr.rhs)?.to_bool()
+                    self.eval_expression(&expr.rhs)?
                 }
             }
         };
-        Ok(Value::Bool(res))
+        Ok(res)
     }
 
     fn eval_binop_expression(&mut self, expr: &ast::BinaryExpression) -> Result<Value, EvalError> {
