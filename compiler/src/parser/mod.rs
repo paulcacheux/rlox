@@ -445,7 +445,7 @@ impl<'c, 's> Parser<'c, 's> {
     fn parse_call(&mut self) -> Result<pt::Expression, ParseError> {
         let mut call = self.parse_primary()?;
 
-        if self.front_matches(Token::LeftParenthesis)? {
+        while self.front_matches(Token::LeftParenthesis)? {
             let left_parenthesis_span = self.expect(Token::LeftParenthesis)?;
             let arguments = self.parse_comma_separated_in_parenthesis(Parser::parse_expression)?;
             let right_parenthesis_span = self.expect(Token::RightParenthesis)?;
