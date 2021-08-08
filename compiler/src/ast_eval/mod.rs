@@ -1,4 +1,4 @@
-use std::{io::Write, sync::Arc};
+use std::io::Write;
 
 use crate::{ast, tree_common as tc, CompilationContext};
 
@@ -6,16 +6,18 @@ mod env;
 mod error;
 mod function;
 mod value;
-pub use env::Environment;
+pub use env::LocalScope;
 pub use error::EvalError;
 use function::FunctionEvaluator;
 pub use value::Value;
+
+use self::env::Environment;
 
 #[derive(Debug)]
 pub struct Evaluator<'c, W: Write> {
     context: &'c CompilationContext,
     functions: Vec<FunctionEvaluator>,
-    current_env: Arc<Environment>,
+    env: Environment,
     stdout: W,
 }
 
@@ -31,41 +33,34 @@ macro_rules! flow {
 
 impl<'c, W: Write> Evaluator<'c, W> {
     pub fn new(context: &'c CompilationContext, stdout: W) -> Self {
-        let current_env = Environment::new();
-
         Evaluator {
             context,
             functions: Vec::new(),
-            current_env,
+            env: Environment::new(),
             stdout,
         }
     }
 
-    fn begin_env(&mut self) {
-        self.current_env = Environment::with_parent(self.current_env.clone());
-    }
-
-    fn end_env(&mut self) {
-        self.current_env = self
-            .current_env
-            .clone()
-            .into_parent()
-            .expect("Failed to switch to parent env");
-    }
-
-    fn create_function_ref(&mut self, evaluator: FunctionEvaluator) -> Value {
+    fn prepare_function_ref(&mut self) -> Value {
         let index = self.functions.len();
-        self.functions.push(evaluator);
         Value::FunctionRef(index)
     }
 
-    fn eval_with_env<T, F>(&mut self, env: Arc<Environment>, eval: F) -> Result<T, EvalError>
+    fn create_function_ref(&mut self, evaluator: FunctionEvaluator, prepared: Value) {
+        let index = self.functions.len();
+        let fun_ref = Value::FunctionRef(index);
+        assert_eq!(prepared, fun_ref);
+
+        self.functions.push(evaluator);
+    }
+
+    fn eval_with_env<T, F>(&mut self, env: Environment, eval: F) -> Result<T, EvalError>
     where
         F: Fn(&mut Self) -> Result<T, EvalError>,
     {
-        let save_env = std::mem::replace(&mut self.current_env, env);
+        let save_env = std::mem::replace(&mut self.env, env);
         let res = eval(self)?;
-        self.current_env = save_env;
+        self.env = save_env;
         Ok(res)
     }
 
@@ -98,8 +93,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 ..
             } => {
                 let init_value = self.eval_expression(init_expression)?;
-                self.current_env
-                    .define_variable(identifier.identifier, init_value);
+                self.env.define_variable(identifier.identifier, init_value);
                 Ok(StatementControlFlow::Continue)
             }
             ast::Statement::FunctionDeclaration {
@@ -108,22 +102,23 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 body,
                 ..
             } => {
+                let fun_ref = self.prepare_function_ref();
+                self.env.define_variable(function_name.identifier, fun_ref);
+
                 let fun_eval = FunctionEvaluator {
-                    parent_env: self.current_env.clone(),
+                    parent_env: self.env.clone_for_function(),
                     parameters: parameters.iter().map(|ident| ident.identifier).collect(),
                     body: body.clone(),
                 };
-                let fun_ref = self.create_function_ref(fun_eval);
-                self.current_env
-                    .define_variable(function_name.identifier, fun_ref);
+                self.create_function_ref(fun_eval, fun_ref);
                 Ok(StatementControlFlow::Continue)
             }
             ast::Statement::Block { statements, .. } => {
-                self.begin_env();
+                self.env.begin_scope();
                 for stmt in statements {
                     flow!(self.eval_statement(stmt));
                 }
-                self.end_env();
+                self.env.end_scope();
                 Ok(StatementControlFlow::Continue)
             }
             ast::Statement::If {
@@ -184,7 +179,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 tc::Literal::Nil => Ok(Value::Nil),
             },
             ast::Expression::Identifier(ident) => {
-                if let Some(value) = self.current_env.get_value(&ident.identifier) {
+                if let Some(value) = self.env.get_value(&ident.identifier) {
                     Ok(value)
                 } else {
                     Err(EvalError {
@@ -205,7 +200,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
         match &*expr.lhs {
             ast::AssignExpressionLhs::Identifier(ident) => {
-                if !self.current_env.set_variable(&ident.identifier, rhs) {
+                if !self.env.set_variable(&ident.identifier, rhs) {
                     Err(EvalError {
                         msg: format!(
                             "Variable `{}` is not defined",
@@ -367,13 +362,14 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
                 let body = function.body.clone();
 
-                let new_env = Environment::with_parent(function.parent_env.clone());
+                let mut func_env = function.parent_env.clone_for_function();
+                func_env.begin_scope();
                 for (param, arg) in function.parameters.iter().zip(args.iter()) {
-                    new_env.define_variable(*param, *arg);
+                    func_env.define_variable(*param, *arg);
                 }
 
                 let control_flow =
-                    self.eval_with_env(new_env, |evaluator| evaluator.eval_statement(&body))?;
+                    self.eval_with_env(func_env, |evaluator| evaluator.eval_statement(&body))?;
                 let ret_value = match control_flow {
                     StatementControlFlow::Continue => Value::Nil,
                     StatementControlFlow::Return(val) => val,
