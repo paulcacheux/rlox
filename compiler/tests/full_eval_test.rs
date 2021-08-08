@@ -38,6 +38,11 @@ fn inner_eval_test(input_path: &str) {
     }
 }
 
+#[test_resources("testsuite/*.lox")]
+fn test_expression_full_eval_top_level(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
 #[test_resources("testsuite/assignment/*.lox")]
 fn test_expression_full_eval_assignment(input_path: &str) {
     if input_path.contains("this") || input_path.contains("grouping") {
@@ -53,6 +58,22 @@ fn test_expression_full_eval_block(input_path: &str) {
 
 #[test_resources("testsuite/bool/*.lox")]
 fn test_expression_full_eval_bool(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/call/*.lox")]
+fn test_expression_full_eval_call(input_path: &str) {
+    if input_path.contains("object") {
+        return; // skip unimplemented stuff
+    }
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/closure/*.lox")]
+fn test_expression_full_eval_closure(input_path: &str) {
+    if input_path.contains("method") {
+        return; // skip unimplemented stuff
+    }
     inner_eval_test(input_path)
 }
 
@@ -93,5 +114,45 @@ fn test_expression_full_eval_string(input_path: &str) {
 
 #[test_resources("testsuite/function/*.lox")]
 fn test_expression_full_eval_function(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/logical_operator/*.lox")]
+fn test_expression_full_eval_logical_operator(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/number/*.lox")]
+fn test_expression_full_eval_number(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/operator/*.lox")]
+fn test_expression_full_eval_operator(input_path: &str) {
+    if input_path.contains("class") || input_path.contains("method") {
+        return; // skip unimplemented stuff
+    }
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/print/*.lox")]
+fn test_expression_full_eval_print(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/return/*.lox")]
+fn test_expression_full_eval_return(input_path: &str) {
+    if input_path.contains("class") || input_path.contains("method") {
+        return; // skip unimplemented stuff
+    }
+    inner_eval_test(input_path)
+}
+
+#[test_resources("testsuite/variable/*.lox")]
+fn test_expression_full_eval_variable(input_path: &str) {
+    if input_path.contains("class") || input_path.contains("method") || input_path.contains("this")
+    {
+        return; // skip unimplemented stuff
+    }
     inner_eval_test(input_path)
 }
