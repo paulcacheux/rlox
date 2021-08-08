@@ -17,11 +17,17 @@ impl Scopes {
     }
 
     pub fn define_identifier(&mut self, sym: DefaultSymbol) -> bool {
+        let is_global_scope = self.stacks.len();
         let top_scope = self
             .stacks
             .last_mut()
             .expect("Failed to get top stack when defining an identifier");
 
-        top_scope.insert(sym)
+        let ret_value = top_scope.insert(sym);
+        if is_global_scope == 1 {
+            true
+        } else {
+            ret_value
+        }
     }
 }
