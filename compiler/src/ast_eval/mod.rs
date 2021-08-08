@@ -109,6 +109,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 ..
             } => {
                 let fun_eval = FunctionEvaluator {
+                    parent_env: self.current_env.clone(),
                     parameters: parameters.iter().map(|ident| ident.identifier).collect(),
                     body: body.clone(),
                 };
@@ -366,14 +367,19 @@ impl<'c, W: Write> Evaluator<'c, W> {
 
                 let body = function.body.clone();
 
-                let new_env = Environment::new();
+                let new_env = Environment::with_parent(function.parent_env.clone());
                 for (param, arg) in function.parameters.iter().zip(args.iter()) {
                     new_env.define_variable(*param, *arg);
                 }
 
-                self.eval_with_env(new_env, |evaluator| evaluator.eval_statement(&body))?;
+                let control_flow =
+                    self.eval_with_env(new_env, |evaluator| evaluator.eval_statement(&body))?;
+                let ret_value = match control_flow {
+                    StatementControlFlow::Continue => Value::Nil,
+                    StatementControlFlow::Return(val) => val,
+                };
 
-                Ok(Value::Nil)
+                Ok(ret_value)
             }
             _ => Err(EvalError {
                 msg: "Called expression must be a function".into(),
