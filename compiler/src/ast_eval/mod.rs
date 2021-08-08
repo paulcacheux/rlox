@@ -337,11 +337,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 msg: "Operand must be a number".into(),
                 span: expr.operator_span,
             }),
-            (tc::UnaryOperator::LogicalNot, Value::Bool(b)) => Ok(Value::Bool(!b)),
-            (tc::UnaryOperator::LogicalNot, _) => Err(EvalError {
-                msg: "Operand must be a boolean".into(),
-                span: expr.operator_span,
-            }),
+            (tc::UnaryOperator::LogicalNot, v) => Ok(Value::Bool(!v.to_bool())),
         }
     }
 
