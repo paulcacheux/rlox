@@ -23,10 +23,7 @@ impl Environment {
     pub fn clone_for_function(&self) -> Environment {
         Environment {
             globals: self.globals.clone(),
-            top_scope: self
-                .top_scope
-                .as_ref()
-                .map(|ts| Arc::new(ts.clone_for_function())),
+            top_scope: self.top_scope.as_ref().map(|ts| Arc::new(ts.collapse())),
         }
     }
 
@@ -117,11 +114,22 @@ impl LocalScope {
         })
     }
 
-    fn clone_for_function(&self) -> LocalScope {
-        let values = self.values.lock().expect("Failed to lock env");
+    fn collapse(&self) -> LocalScope {
+        fn collapse_inner(scope: &LocalScope) -> HashMap<DefaultSymbol, Value> {
+            let mut parent = scope
+                .parent
+                .as_ref()
+                .map(|ls| collapse_inner(&ls))
+                .unwrap_or_default();
+
+            let values = scope.values.lock().expect("Failed to lock env");
+            parent.extend(values.iter().map(|(&k, &v)| (k, v)));
+            parent
+        }
+
         LocalScope {
-            parent: self.parent.clone(),
-            values: Mutex::new(values.clone()),
+            parent: None,
+            values: Mutex::new(collapse_inner(self)),
         }
     }
 
