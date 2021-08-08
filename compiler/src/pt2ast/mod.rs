@@ -30,7 +30,7 @@ impl<'c> Translator<'c> {
         let statements: Result<Vec<_>, _> = prog
             .declarations
             .into_iter()
-            .map(|decl| self.translate_declaration(decl))
+            .map(|decl| self.translate_declaration(decl, false))
             .collect();
         let statements = statements?;
         self.scopes.end_scope();
@@ -41,10 +41,11 @@ impl<'c> Translator<'c> {
     pub fn translate_declaration(
         &mut self,
         declaration: pt::Declaration,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         match declaration {
             pt::Declaration::Var(decl) => self.translate_var_declaration(decl),
-            pt::Declaration::Statement(stmt) => self.translate_statement(stmt),
+            pt::Declaration::Statement(stmt) => self.translate_statement(stmt, in_function),
             pt::Declaration::Fun(fun) => self.translate_function_declaration(fun),
         }
     }
@@ -103,7 +104,7 @@ impl<'c> Translator<'c> {
             param_set.insert(param.identifier);
         }
 
-        let body = self.translate_block_statement(*decl.body)?;
+        let body = self.translate_block_statement(*decl.body, true)?;
 
         Ok(ast::Statement::FunctionDeclaration {
             fun_keyword_span: decl.fun_keyword_span,
@@ -118,28 +119,30 @@ impl<'c> Translator<'c> {
     pub fn translate_statement(
         &mut self,
         statement: pt::Statement,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         match statement {
-            pt::Statement::Block(bs) => self.translate_block_statement(bs),
+            pt::Statement::Block(bs) => self.translate_block_statement(bs, in_function),
             pt::Statement::Expression(es) => self.translate_expression_statement(es),
-            pt::Statement::If(is) => self.translate_if_statement(is),
-            pt::Statement::While(ws) => self.translate_while_statement(ws),
-            pt::Statement::For(fs) => self.translate_for_statement(fs),
+            pt::Statement::If(is) => self.translate_if_statement(is, in_function),
+            pt::Statement::While(ws) => self.translate_while_statement(ws, in_function),
+            pt::Statement::For(fs) => self.translate_for_statement(fs, in_function),
             pt::Statement::Print(ps) => self.translate_print_statement(ps),
-            pt::Statement::Return(rs) => self.translate_return_statement(rs),
+            pt::Statement::Return(rs) => self.translate_return_statement(rs, in_function),
         }
     }
 
     pub fn translate_block_statement(
         &mut self,
         statement: pt::BlockStatement,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         self.scopes.begin_scope();
 
         let statements: Result<Vec<_>, _> = statement
             .declarations
             .into_iter()
-            .map(|decl| self.translate_declaration(decl))
+            .map(|decl| self.translate_declaration(decl, in_function))
             .collect();
         let statements = statements?;
 
@@ -169,7 +172,14 @@ impl<'c> Translator<'c> {
     pub fn translate_return_statement(
         &mut self,
         statement: pt::ReturnStatement,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
+        if !in_function {
+            return Err(SemanticError::ReturnOutsideFunction {
+                return_span: statement.return_keyword_span,
+            });
+        }
+
         let expr = statement
             .expression
             .map(|expr| self.translate_expression(*expr))
@@ -199,12 +209,13 @@ impl<'c> Translator<'c> {
     pub fn translate_if_statement(
         &mut self,
         statement: pt::IfStatement,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         let condition = self.translate_expression(*statement.condition)?;
-        let true_body = self.translate_statement(*statement.body)?;
+        let true_body = self.translate_statement(*statement.body, in_function)?;
 
         let (false_body, else_keyword_span) = if let Some(else_part) = statement.else_statement {
-            let body = self.translate_statement(*else_part.body)?;
+            let body = self.translate_statement(*else_part.body, in_function)?;
             (body, else_part.else_keyword_span)
         } else {
             let empty_body = ast::Statement::Block {
@@ -229,9 +240,10 @@ impl<'c> Translator<'c> {
     pub fn translate_while_statement(
         &mut self,
         statement: pt::WhileStatement,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         let condition = self.translate_expression(*statement.condition)?;
-        let body = self.translate_statement(*statement.body)?;
+        let body = self.translate_statement(*statement.body, in_function)?;
 
         Ok(ast::Statement::While {
             condition: Box::new(condition),
@@ -245,6 +257,7 @@ impl<'c> Translator<'c> {
     pub fn translate_for_statement(
         &mut self,
         statement: pt::ForStatement,
+        in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         let init = match *statement.init {
             pt::VarDeclOrExpressionStatement::Var(var_decl) => {
@@ -264,7 +277,7 @@ impl<'c> Translator<'c> {
             })
         };
 
-        let body = self.translate_statement(*statement.body)?;
+        let body = self.translate_statement(*statement.body, in_function)?;
 
         let res_loop_body = if let Some(step) = statement.step {
             let step = self.translate_expression(*step)?;

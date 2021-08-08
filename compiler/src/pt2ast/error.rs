@@ -11,6 +11,9 @@ pub enum SemanticError {
     LhsNotAssignable {
         lhs_span: Span,
     },
+    ReturnOutsideFunction {
+        return_span: Span,
+    },
 }
 
 impl fmt::Display for SemanticError {
@@ -31,6 +34,9 @@ impl fmt::Display for SemanticError {
                     lhs_span
                 )
             }
+            SemanticError::ReturnOutsideFunction { return_span } => {
+                write!(f, "[span: {:?}]: Return outside of function", return_span)
+            }
         }
     }
 }
@@ -44,6 +50,7 @@ impl ErrorSpannable for SemanticError {
                 identifier_span, ..
             } => *identifier_span,
             SemanticError::LhsNotAssignable { lhs_span } => *lhs_span,
+            SemanticError::ReturnOutsideFunction { return_span } => *return_span,
         }
     }
 }
