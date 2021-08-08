@@ -19,6 +19,16 @@ pub struct Evaluator<'c, W: Write> {
     stdout: W,
 }
 
+macro_rules! flow {
+    ($stmt_eval:expr) => {
+        match $stmt_eval {
+            ret @ Ok(StatementControlFlow::Return(_)) => return ret,
+            err @ Err(_) => return err,
+            Ok(StatementControlFlow::Continue) => {}
+        }
+    };
+}
+
 impl<'c, W: Write> Evaluator<'c, W> {
     pub fn new(context: &'c CompilationContext, stdout: W) -> Self {
         let current_env = Environment::new();
@@ -65,7 +75,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
             Value::Number(value) => value.to_string(),
             Value::Bool(value) => value.to_string(),
             Value::String(sym) => self.context.resolve_str_symbol(sym),
-            Value::FunctionRef(index) => format!("<function [{}]>", index),
+            Value::FunctionRef(index) => format!("<fn {}>", index),
         }
     }
 
@@ -77,7 +87,10 @@ impl<'c, W: Write> Evaluator<'c, W> {
         Ok(())
     }
 
-    pub fn eval_statement(&mut self, stmt: &ast::Statement) -> Result<(), EvalError> {
+    pub fn eval_statement(
+        &mut self,
+        stmt: &ast::Statement,
+    ) -> Result<StatementControlFlow, EvalError> {
         match stmt {
             ast::Statement::VarDeclaration {
                 identifier,
@@ -87,7 +100,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 let init_value = self.eval_expression(init_expression)?;
                 self.current_env
                     .define_variable(identifier.identifier, init_value);
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
             ast::Statement::FunctionDeclaration {
                 function_name,
@@ -102,15 +115,15 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 let fun_ref = self.create_function_ref(fun_eval);
                 self.current_env
                     .define_variable(function_name.identifier, fun_ref);
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
             ast::Statement::Block { statements, .. } => {
                 self.begin_env();
                 for stmt in statements {
-                    self.eval_statement(stmt)?;
+                    flow!(self.eval_statement(stmt));
                 }
                 self.end_env();
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
             ast::Statement::If {
                 condition,
@@ -119,39 +132,39 @@ impl<'c, W: Write> Evaluator<'c, W> {
                 ..
             } => {
                 if self.eval_expression(condition)?.to_bool() {
-                    self.eval_statement(true_body)?;
+                    flow!(self.eval_statement(true_body));
                 } else {
-                    self.eval_statement(false_body)?;
+                    flow!(self.eval_statement(false_body));
                 }
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
             ast::Statement::While {
                 condition, body, ..
             } => {
                 while self.eval_expression(condition)?.to_bool() {
-                    self.eval_statement(body)?;
+                    flow!(self.eval_statement(body));
                 }
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
             ast::Statement::Print { expression, .. } => {
                 let print_value = self.eval_expression(expression)?;
                 writeln!(self.stdout, "{}", self.value_to_str(print_value))
                     .expect("Failed to write to stdout");
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
             ast::Statement::Return { expression, .. } => {
-                let expr = expression
+                let ret_value = expression
                     .as_ref()
                     .map(|expr| self.eval_expression(&expr))
                     .transpose()?
                     .unwrap_or(Value::Nil);
-                Ok(())
+                Ok(StatementControlFlow::Return(ret_value))
             }
             ast::Statement::Expression { expression, .. } => {
                 if let Some(expr) = expression {
                     self.eval_expression(expr)?;
                 }
-                Ok(())
+                Ok(StatementControlFlow::Continue)
             }
         }
     }
@@ -368,4 +381,10 @@ impl<'c, W: Write> Evaluator<'c, W> {
             }),
         }
     }
+}
+
+#[derive(Debug)]
+pub enum StatementControlFlow {
+    Continue,
+    Return(Value),
 }

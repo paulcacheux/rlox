@@ -88,6 +88,7 @@ impl<'c, 's> Parser<'c, 's> {
         let front_st = self.lexer.peek_token()?;
         let decl = match front_st.token {
             Token::VarKeyword => pt::Declaration::Var(self.parse_var_declaration()?),
+            Token::FunKeyword => pt::Declaration::Fun(self.parse_function_declaration()?),
             _ => pt::Declaration::Statement(self.parse_statement()?),
         };
         Ok(decl)
@@ -136,7 +137,7 @@ impl<'c, 's> Parser<'c, 's> {
         let left_parenthesis_span = self.expect(Token::LeftParenthesis)?;
         let parameters =
             self.parse_comma_separated_in_parenthesis(|parser| parser.parse_function_parameter())?;
-        let right_parenthesis_span = self.expect(Token::LeftParenthesis)?;
+        let right_parenthesis_span = self.expect(Token::RightParenthesis)?;
         let body = self.parse_block_statement()?;
 
         Ok(pt::FunctionDeclaration {
@@ -209,6 +210,7 @@ impl<'c, 's> Parser<'c, 's> {
             Token::WhileKeyword => pt::Statement::While(self.parse_while_statement()?),
             Token::ForKeyword => pt::Statement::For(self.parse_for_statement()?),
             Token::PrintKeyword => pt::Statement::Print(self.parse_print_statement()?),
+            Token::ReturnKeyword => pt::Statement::Return(self.parse_return_statement()?),
             Token::LeftBracket => pt::Statement::Block(self.parse_block_statement()?),
             _ => pt::Statement::Expression(self.parse_expression_statement()?),
         };
@@ -323,6 +325,21 @@ impl<'c, 's> Parser<'c, 's> {
         Ok(pt::PrintStatement {
             expression: Box::new(expression),
             print_keyword_span,
+            semicolon_span,
+        })
+    }
+
+    pub fn parse_return_statement(&mut self) -> Result<pt::ReturnStatement, ParseError> {
+        let return_keyword_span = self.expect(Token::ReturnKeyword)?;
+        let expr = if !self.front_matches(Token::SemiColon)? {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        let semicolon_span = self.expect(Token::SemiColon)?;
+        Ok(pt::ReturnStatement {
+            expression: expr.map(Box::new),
+            return_keyword_span,
             semicolon_span,
         })
     }
