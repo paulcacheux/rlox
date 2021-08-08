@@ -32,10 +32,11 @@ pub enum ExpectInfo {
 pub fn extract_expect(test_desc_input: &str) -> ExpectInfo {
     const EXPECT_PREFIX: &str = "// expect: ";
     const EXPECT_RUNTIME_ERROR_PREFIX: &str = "// expect runtime error: ";
+    const EXPECT_COMPILE_ERROR_IMPLICIT: &str = "// Error at";
 
     let mut res = String::new();
 
-    for line in test_desc_input.lines() {
+    for (line_index, line) in test_desc_input.lines().enumerate() {
         if let Some(pat_start) = line.find(EXPECT_PREFIX) {
             let rest_start = pat_start + EXPECT_PREFIX.len();
             res.push_str(&line[rest_start..]);
@@ -44,6 +45,12 @@ pub fn extract_expect(test_desc_input: &str) -> ExpectInfo {
 
         if line.find(EXPECT_RUNTIME_ERROR_PREFIX).is_some() {
             return ExpectInfo::RuntimeError;
+        }
+
+        if line.find(EXPECT_COMPILE_ERROR_IMPLICIT).is_some() {
+            return ExpectInfo::CompileError {
+                line: line_index + 1,
+            };
         }
 
         if let Some(captures) = EXPECT_COMPILE_ERROR.captures(&line) {

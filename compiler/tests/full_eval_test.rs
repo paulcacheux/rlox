@@ -38,6 +38,11 @@ fn inner_eval_test(input_path: &str) {
     }
 }
 
+#[test_resources("testsuite/assignment/*.lox")]
+fn test_expression_full_eval_assignment(input_path: &str) {
+    inner_eval_test(input_path)
+}
+
 #[test_resources("testsuite/block/*.lox")]
 fn test_expression_full_eval_block(input_path: &str) {
     inner_eval_test(input_path)
