@@ -14,6 +14,9 @@ pub enum SemanticError {
     ReturnOutsideFunction {
         return_span: Span,
     },
+    CyclicDefinition {
+        var_span: Span,
+    },
 }
 
 impl fmt::Display for SemanticError {
@@ -37,6 +40,9 @@ impl fmt::Display for SemanticError {
             SemanticError::ReturnOutsideFunction { return_span } => {
                 write!(f, "[span: {:?}]: Return outside of function", return_span)
             }
+            SemanticError::CyclicDefinition { var_span } => {
+                write!(f, "[span: {:?}]: Cyclic definition", var_span)
+            }
         }
     }
 }
@@ -51,6 +57,7 @@ impl ErrorSpannable for SemanticError {
             } => *identifier_span,
             SemanticError::LhsNotAssignable { lhs_span } => *lhs_span,
             SemanticError::ReturnOutsideFunction { return_span } => *return_span,
+            SemanticError::CyclicDefinition { var_span } => *var_span,
         }
     }
 }

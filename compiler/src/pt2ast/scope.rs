@@ -5,6 +5,7 @@ use string_interner::DefaultSymbol;
 #[derive(Debug, Default)]
 pub struct Scopes {
     stacks: Vec<HashSet<DefaultSymbol>>,
+    current_var_decl: Option<DefaultSymbol>,
 }
 
 impl Scopes {
@@ -32,5 +33,17 @@ impl Scopes {
         } else {
             ret_value
         }
+    }
+
+    pub fn is_current_var_decl(&self, sym: DefaultSymbol) -> bool {
+        self.current_var_decl == Some(sym)
+    }
+
+    pub fn set_current_var_decl(&mut self, sym: DefaultSymbol) {
+        self.current_var_decl = Some(sym);
+    }
+
+    pub fn clear_current_var_decl(&mut self) {
+        self.current_var_decl = None
     }
 }

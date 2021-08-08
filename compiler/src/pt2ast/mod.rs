@@ -53,29 +53,62 @@ impl<'c> Translator<'c> {
         &mut self,
         var_decl: pt::VarDeclaration,
     ) -> Result<ast::Statement, SemanticError> {
-        if !self
-            .scopes
-            .define_identifier(var_decl.identifier.identifier)
-        {
-            return Err(SemanticError::IdentifierAlreadyDefined {
-                identifier: self
-                    .context
-                    .resolve_str_symbol(var_decl.identifier.identifier),
-                identifier_span: var_decl.identifier.span,
-            });
-        }
+        let (init_expression, equal_span) = if self.scopes.is_at_global_scope() {
+            if !self
+                .scopes
+                .define_identifier(var_decl.identifier.identifier)
+            {
+                return Err(SemanticError::IdentifierAlreadyDefined {
+                    identifier: self
+                        .context
+                        .resolve_str_symbol(var_decl.identifier.identifier),
+                    identifier_span: var_decl.identifier.span,
+                });
+            }
 
-        let (init_expression, equal_span) = if let Some(init) = var_decl.init {
-            (
-                self.translate_expression(*init.expression)?,
-                init.equal_span,
-            )
+            if let Some(init) = var_decl.init {
+                (
+                    self.translate_expression(*init.expression)?,
+                    init.equal_span,
+                )
+            } else {
+                let expr = ast::Expression::Literal(tc::LiteralExpression {
+                    literal: tc::Literal::Nil,
+                    span: Span::INVALID,
+                });
+                (expr, Span::INVALID)
+            }
         } else {
-            let expr = ast::Expression::Literal(tc::LiteralExpression {
-                literal: tc::Literal::Nil,
-                span: Span::INVALID,
-            });
-            (expr, Span::INVALID)
+            self.scopes
+                .set_current_var_decl(var_decl.identifier.identifier);
+
+            let (init_expression, equal_span) = if let Some(init) = var_decl.init {
+                (
+                    self.translate_expression(*init.expression)?,
+                    init.equal_span,
+                )
+            } else {
+                let expr = ast::Expression::Literal(tc::LiteralExpression {
+                    literal: tc::Literal::Nil,
+                    span: Span::INVALID,
+                });
+                (expr, Span::INVALID)
+            };
+
+            self.scopes.clear_current_var_decl();
+
+            if !self
+                .scopes
+                .define_identifier(var_decl.identifier.identifier)
+            {
+                return Err(SemanticError::IdentifierAlreadyDefined {
+                    identifier: self
+                        .context
+                        .resolve_str_symbol(var_decl.identifier.identifier),
+                    identifier_span: var_decl.identifier.span,
+                });
+            }
+            (init_expression, equal_span)
         };
 
         Ok(ast::Statement::VarDeclaration {
@@ -338,7 +371,7 @@ impl<'c> Translator<'c> {
                 sub: Box::new(self.translate_expression(*sub)?),
             })),
             pt::Expression::Literal(literal) => Ok(ast::Expression::Literal(literal)),
-            pt::Expression::Identifier(id) => Ok(ast::Expression::Identifier(id)),
+            pt::Expression::Identifier(id) => self.translate_identifier_expression(id),
             pt::Expression::Call(call) => Ok(ast::Expression::Call(ast::CallExpression {
                 function: Box::new(self.translate_expression(*call.function)?),
                 arguments: call
@@ -349,6 +382,19 @@ impl<'c> Translator<'c> {
                 left_parenthesis_span: call.left_parenthesis_span,
                 right_parenthesis_span: call.right_parenthesis_span,
             })),
+        }
+    }
+
+    fn translate_identifier_expression(
+        &mut self,
+        expr: tc::IdentifierExpression,
+    ) -> Result<ast::Expression, SemanticError> {
+        if self.scopes.is_current_var_decl(expr.identifier) {
+            Err(SemanticError::CyclicDefinition {
+                var_span: expr.span,
+            })
+        } else {
+            Ok(ast::Expression::Identifier(expr))
         }
     }
 
