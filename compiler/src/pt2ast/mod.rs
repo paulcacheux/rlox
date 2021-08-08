@@ -9,7 +9,6 @@ mod scope;
 use scope::Scopes;
 
 use self::error::SemanticError;
-use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Translator<'c> {
@@ -92,19 +91,17 @@ impl<'c> Translator<'c> {
         &mut self,
         decl: pt::FunctionDeclaration,
     ) -> Result<ast::Statement, SemanticError> {
-        let mut param_set = HashSet::new();
+        self.scopes.begin_scope();
         for param in &decl.parameters {
-            if param_set.contains(&param.identifier) {
+            if !self.scopes.define_identifier(param.identifier) {
                 return Err(SemanticError::IdentifierAlreadyDefined {
                     identifier: self.context.resolve_str_symbol(param.identifier),
                     identifier_span: param.span,
                 });
             }
-
-            param_set.insert(param.identifier);
         }
-
-        let body = self.translate_block_statement(*decl.body, true)?;
+        let body = self.translate_block_statement(*decl.body, true, false)?;
+        self.scopes.end_scope();
 
         Ok(ast::Statement::FunctionDeclaration {
             fun_keyword_span: decl.fun_keyword_span,
@@ -122,7 +119,7 @@ impl<'c> Translator<'c> {
         in_function: bool,
     ) -> Result<ast::Statement, SemanticError> {
         match statement {
-            pt::Statement::Block(bs) => self.translate_block_statement(bs, in_function),
+            pt::Statement::Block(bs) => self.translate_block_statement(bs, in_function, true),
             pt::Statement::Expression(es) => self.translate_expression_statement(es),
             pt::Statement::If(is) => self.translate_if_statement(is, in_function),
             pt::Statement::While(ws) => self.translate_while_statement(ws, in_function),
@@ -136,8 +133,11 @@ impl<'c> Translator<'c> {
         &mut self,
         statement: pt::BlockStatement,
         in_function: bool,
+        create_scope: bool,
     ) -> Result<ast::Statement, SemanticError> {
-        self.scopes.begin_scope();
+        if create_scope {
+            self.scopes.begin_scope();
+        }
 
         let statements: Result<Vec<_>, _> = statement
             .declarations
@@ -152,7 +152,9 @@ impl<'c> Translator<'c> {
             right_bracket_span: statement.right_bracket_span,
         };
 
-        self.scopes.end_scope();
+        if create_scope {
+            self.scopes.end_scope();
+        }
 
         Ok(bs)
     }
