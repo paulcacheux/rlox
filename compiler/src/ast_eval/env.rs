@@ -131,7 +131,7 @@ impl LocalScope {
             let mut parent = scope
                 .parent
                 .as_ref()
-                .map(|ls| collapse_inner(&ls))
+                .map(|ls| collapse_inner(ls))
                 .unwrap_or_default();
 
             let values = scope.values.lock().expect("Failed to lock env");

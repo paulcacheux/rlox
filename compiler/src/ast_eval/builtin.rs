@@ -14,9 +14,9 @@ impl BuiltinFunction {
         }
     }
 
-    pub fn eval<'c, W: Write>(
+    pub fn eval<W: Write>(
         self,
-        evaluator: &Evaluator<'c, W>,
+        evaluator: &Evaluator<W>,
         _args: &[Value],
     ) -> Result<Value, EvalError> {
         match self {
@@ -25,7 +25,7 @@ impl BuiltinFunction {
     }
 }
 
-fn clock_eval<'c, W: Write>(evalutor: &Evaluator<'c, W>) -> Value {
+fn clock_eval<W: Write>(evalutor: &Evaluator<W>) -> Value {
     let elapsed = evalutor.start_eval_time.elapsed().as_secs();
     Value::Number(elapsed as _)
 }

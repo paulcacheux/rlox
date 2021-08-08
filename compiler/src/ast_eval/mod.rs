@@ -160,7 +160,7 @@ impl<'c, W: Write> Evaluator<'c, W> {
             ast::Statement::Return { expression, .. } => {
                 let ret_value = expression
                     .as_ref()
-                    .map(|expr| self.eval_expression(&expr))
+                    .map(|expr| self.eval_expression(expr))
                     .transpose()?
                     .unwrap_or(Value::Nil);
                 Ok(StatementControlFlow::Return(ret_value))
